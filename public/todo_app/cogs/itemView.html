@@ -1,0 +1,37 @@
+
+<blueprint>
+
+    <sensor node="itemText" on="dblclick" transform="bool true" pipe="editing" />
+    <sensor node="markBtn" on="click" transform="read item" pipe="cmd_MarkTodo" />
+    <sensor node="destroyBtn" on="click" transform="read item" pipe="cmd_DestroyTodo" />
+    <sensor watch="item" extract="text" change="true" run="renderText" />
+    <sensor watch="item" extract="completed" change="true" run="renderMark" />
+
+</blueprint>
+
+
+<display>
+
+        <div id="itemView" class="view">
+            <input id="markBtn" class="toggle" type="checkbox" checked />
+            <label id="itemText"></label>
+            <button id="destroyBtn" class="destroy"></button>
+        </div>
+
+</display>
+
+<script>
+
+    $.cog({
+
+        renderText: function(msg){
+            this.itemText.text(msg);
+        },
+
+        renderMark: function(msg) {
+            this.markBtn.prop("checked", msg);
+        }
+
+    });
+
+</script>

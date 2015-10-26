@@ -1,0 +1,33 @@
+<blueprint>
+
+    <sensor node="toggleAll" on="click" transform="toChecked" pipe="cmd_MarkAll" />
+    <chain find="list" source="storageView" item="data item" url="item.html" />
+
+</blueprint>
+
+
+<display>
+
+    <div>
+
+        <input id="toggleAll" class="id_toggle-all" type="checkbox">
+        <label id="label" style="display: none;">Mark all as complete</label>
+        <ul id="list" class="id_todo-list" ></ul>
+
+    </div>
+
+</display>
+
+
+<script>
+
+    $.cog({
+
+        toChecked: function(){
+            return this.toggleAll.prop('checked');
+        }
+
+    });
+
+</script>
+

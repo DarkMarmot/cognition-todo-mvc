@@ -1,0 +1,38 @@
+<blueprint>
+
+    <prop find="filter" />
+
+</blueprint>
+
+
+<script>
+
+    $.cog({
+
+        init: function(){
+
+            var self = this;
+
+            this.router  = new Router({
+                '/active': function () {
+                    self.filter.write('activeFilter');
+                },
+                '/completed': function () {
+                    self.filter.write('completedFilter');
+                }
+            });
+
+            this.router.configure({
+                notfound: function () {
+                    window.location.hash = '';
+                    self.filter.write('noFilter');
+                }
+            });
+
+            this.router.init();
+
+        }
+
+    });
+
+</script>

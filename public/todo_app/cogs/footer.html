@@ -1,0 +1,44 @@
+<blueprint>
+
+    <sensor watch="activeCount,completedCount,filter" run="render" />
+    <sensor node="clearCompletedBtn" on="click" pipe="cmd_ClearCompleted" />
+
+</blueprint>
+
+<display>
+
+    <span class="id_todo-count" >
+        <strong><span id="activeCountText" class="id_active-count">1</span></strong>
+        <span id="itemLeftText"> item left</span>
+    </span>
+
+    <ul class="id_filters" >
+        <li><a id="allBtn" href="#/">All</a></li>
+        <li><a id="activeBtn" href="#/active">Active</a></li>
+        <li><a id="completedBtn" href="#/completed">Completed</a></li>
+    </ul>
+
+    <button id="clearCompletedBtn" class="id_clear-completed" ></button>
+
+</display>
+
+<script>
+
+    $.cog({
+
+       render: function(msg){
+
+           this.allBtn.toggleClass('selected', msg.filter === 'noFilter');
+           this.activeBtn.toggleClass('selected', msg.filter === 'activeFilter');
+           this.completedBtn.toggleClass('selected', msg.filter === 'completedFilter');
+
+           this.activeCountText.text(msg.activeCount);
+           this.itemLeftText.text(' item' + (msg.activeCount === 1 ? '' : 's') + ' left');
+           this.clearCompletedBtn.text('Clear completed (' + msg.completedCount + ')');
+           this.clearCompletedBtn.toggle(msg.completedCount > 0);
+
+       }
+
+    });
+
+</script>

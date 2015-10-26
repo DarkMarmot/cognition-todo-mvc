@@ -1,0 +1,40 @@
+
+<blueprint>
+
+
+    <data name="itemRenderer" url="itemView.html" />
+    <data name="editing" value="false" />
+
+    <sensor watch="editing" transform="toUrl" pipe="itemRenderer" />
+    <sensor watch="item,editing" run="render" />
+
+    <cog find="listItem" url="data itemRenderer" />
+
+</blueprint>
+
+
+<display>
+
+    <li id="listItem" ></li>
+
+</display>
+
+
+<script>
+
+    $.cog({
+
+        toUrl: function(msg){
+            return msg ? 'itemEdit.html' : 'itemView.html';
+        },
+
+        render: function(msg){
+
+                this.listItem.toggleClass("completed", msg.item.completed);
+                this.listItem.toggleClass('editing', msg.editing);
+
+        }
+
+    });
+
+</script>

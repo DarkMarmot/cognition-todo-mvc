@@ -1,0 +1,42 @@
+<blueprint>
+
+    <data name="todoEntry" />
+    <sensor node="newTodo" on="keydown" filter="isEnter" transform="trimText" pipe="todoEntry" />
+    <sensor watch="todoEntry" adapt="trimText" filter="hasText" pipe="cmd_CreateTodo" />
+    <sensor watch="cmd_CreateTodo" run="clearEntry" />
+
+</blueprint>
+
+
+<display>
+    <div class="id_header">
+        <h1>todos</h1>
+        <input id="newTodo" class="id_new-todo" placeholder="What needs to be done?" autofocus>
+    </div>
+</display>
+
+
+<script>
+    $.cog({
+
+        ENTER_KEY: 13,
+
+        isEnter: function(ev){
+            return ev.which === this.ENTER_KEY;
+        },
+
+        trimText: function(){
+            return this.newTodo.val().trim();
+        },
+
+        hasText: function(msg){
+            return msg.length > 0;
+        },
+
+        clearEntry: function(msg,topic,tag){
+            this.newTodo.val('');
+        }
+
+
+    });
+</script>

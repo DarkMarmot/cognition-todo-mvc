@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8">
+		<title>Template • TodoMVC</title>
+		<link rel="stylesheet" href="bower_components/todomvc-common/base.css">
+		<link rel="stylesheet" href="css/app.css">
+	</head>
+	<body>
+
+        <div id="todo_app"></div>
+
+		<script src="bower_components/todomvc-common/base.js"></script>
+        <script src="bower_components/director/director.js"></script>
+        <script src="bower_components/jquery/jquery.js"></script>
+        <script src="js/lib/catbus.js"></script>
+        <script src="js/lib/cognition.js"></script>
+
+        <script>
+
+            $(function(){
+                $.cognition.init($("#todo_app"), "todo_app/cogs/app.html");
+            });
+
+        </script>
+
+	</body>
+</html>

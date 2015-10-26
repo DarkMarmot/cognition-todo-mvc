@@ -1,0 +1,54 @@
+<blueprint>
+
+    <preload url="footer.html" />
+    <preload url="header.html" />
+    <preload url="main.html" />
+    <preload url="item.html" />
+    <preload url="itemEdit.html" />
+    <preload url="itemView.html" />
+
+    <alloy url="../alloys/storage.html" />
+    <alloy url="../alloys/routes.html" />
+
+    <sensor watch="storage" adapt="hasItems" change="true" run="render" />
+
+    <cog find="main" url="main.html" />
+    <cog find="header" url="header.html" />
+    <cog find="footer" url="footer.html" />
+
+</blueprint>
+
+<display>
+
+    <div id="app">
+
+        <section class="id_todoapp">
+            <header class="id_header" id="header" ></header>
+            <section class="id_main" id="main" ></section>
+            <footer class="id_footer" id="footer" ></footer>
+        </section>
+
+        <footer class="id_info" >
+            <p>Double-click to edit a todo</p>
+            <p>Created by <a href="https://github.com/DarkMarmot/">Scott Southworth</a> and <a href="https://github.com/landonbar/">Landon Barnickle</a></p>
+            <p>Part of <a href="http://todomvc.com">TodoMVC</a></p>
+        </footer>
+
+    </div>
+
+</display>
+
+
+<script>
+    $.cog({
+
+        hasItems: function(msg) { return msg.length > 0; },
+
+        render: function (msg) {
+            var style = {visibility: msg ? 'visible' : 'hidden'};
+            this.main.css(style);
+            this.footer.css(style);
+        }
+
+    });
+</script>
