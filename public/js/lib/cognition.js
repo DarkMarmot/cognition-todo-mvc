@@ -304,6 +304,59 @@
         return undefined;
     }
 
+
+    function extractCommandDef(sel){
+
+        var d = {
+
+            name: extractString(sel, 'name'),
+            pipe: extractString(sel, 'pipe'),
+            pipeWhere: extractString(sel, 'pipeWhere', 'first'), // first, last, local, outer -- todo switch to prop based
+            filter: extractString(sel, 'filter'),
+            topic: extractString(sel, 'for,on,topic', 'update'),
+            run: extractString(sel, 'run'),
+            emit: extractString(sel, 'emit'),
+            emitPresent: extractHasAttr(sel, 'emit'),
+            emitType: null,
+            once: extractBool(sel, 'once'),
+            retain: extractBool(sel, 'retain'),
+            group: extractBool(sel, 'group'),
+            change: extractBool(sel, 'change,distinct,skipDupes', false),
+            extract: extractString(sel, 'extract'),
+            transform: extractString(sel, 'transform'),
+            transformPresent: extractHasAttr(sel, 'transform'),
+            transformType: null,
+            adapt: extractString(sel, 'adapt'),
+            adaptPresent: extractHasAttr(sel, 'adapt'),
+            adaptType: null,
+            autorun: false,
+            batch: extractBool(sel, 'batch'),
+            keep: extractString(sel, 'keep', 'last'), // first, all, or last
+            need: extractStringArray(sel, 'need,needs'),
+            gather: extractStringArray(sel, 'gather'),
+            defer: extractBool(sel, 'defer')
+
+        };
+
+        d.watch = [d.name];
+
+        // add watches to the gathering
+        if(d.gather.length > 0)
+            d.gather.push(d.name);
+
+        d.batch = d.batch || d.run;
+        d.group = d.batch; // todo make new things to avoid grouping and batching with positive statements
+        d.retain = d.group;
+
+        applyFieldType(d, 'transform', PROP);
+        applyFieldType(d, 'emit', STRING);
+        applyFieldType(d, 'adapt', PROP);
+
+        return d;
+
+    }
+
+
     function extractSensorDef(sel){
 
         var d = {
@@ -1947,22 +2000,23 @@
 
         } else {
 
-
-            for (var i = 0; i < def.watch.length; i++) {
-                dataPlace = mi.find(def.watch[i], def.thing, def.where);
-                if (!def.optional && !dataPlace) {
-                    mi.throwError("Could not build sensor: " + def.thing + ":" + def.watch[i] + ":" + def.where + " in " + mi.resolvedUrl);
-                    return;
-                }
-                if (dataPlace)
-                    actualPlaceNames.push(dataPlace._name);
-            }
+            // todo can rm this? -- checks for data good
+            //
+            //for (var i = 0; i < def.watch.length; i++) {
+            //    dataPlace = mi.find(def.watch[i], def.thing, def.where);
+            //    if (!def.optional && !dataPlace) {
+            //        mi.throwError("Could not build sensor: " + def.thing + ":" + def.watch[i] + ":" + def.where + " in " + mi.resolvedUrl);
+            //        return;
+            //    }
+            //    if (dataPlace)
+            //        actualPlaceNames.push(dataPlace._name);
+            //}
 
             // todo make multiloc upfront and don't search names again
-            if (actualPlaceNames.length === 0)
-                return null; // optional places not found
+            //if (actualPlaceNames.length === 0)
+            //    return null; // optional places not found
 
-            sensor = mi.cogZone.findData(actualPlaceNames, def.where, def.optional).on(def.topic);
+            sensor = mi.cogZone.findData(def.watch, def.where, def.optional).on(def.topic);
             //sensor = bus.location(actualPlaceNames).on(def.topic);
         }
 
