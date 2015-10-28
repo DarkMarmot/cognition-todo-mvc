@@ -6,12 +6,12 @@
     <data name="completedCount" />
     <data name="filter" value="noFilter" />
 
-    <sensor cmd="cmd_MarkTodo" gather="storage" transform="markTodo" pipe="storage" />
-    <sensor cmd="cmd_CreateTodo" gather="storage" transform="createTodo" pipe="storage" />
-    <sensor cmd="cmd_DestroyTodo" gather="storage" transform="destroyTodo" pipe="storage" />
-    <sensor cmd="cmd_MarkAll" gather="storage" transform="markAll" pipe="storage" />
-    <sensor cmd="cmd_ClearCompleted" gather="storage" transform="clearCompleted" pipe="storage" />
-    <sensor cmd="cmd_Refresh" gather="storage" extract="storage" pipe="storage" />
+    <command name="cmd_MarkTodo" need="storage" transform="markTodo" pipe="storage" />
+    <command name="cmd_CreateTodo" need="storage" transform="createTodo" pipe="storage" />
+    <command name="cmd_DestroyTodo" need="storage" transform="destroyTodo" pipe="storage" />
+    <command name="cmd_MarkAll" need="storage" transform="markAll" pipe="storage" />
+    <command name="cmd_ClearCompleted" need="storage" transform="clearCompleted" pipe="storage" />
+    <command name="cmd_Refresh" need="storage" extract="storage" pipe="storage" />
 
     <sensor watch="storage" run="writeLocalStorage"  />
     <sensor watch="storage" transform="toActiveCount" pipe="activeCount" />

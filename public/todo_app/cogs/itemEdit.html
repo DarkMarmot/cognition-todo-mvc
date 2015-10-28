@@ -8,10 +8,10 @@
 
     <sensor watch="cmd_Submit,cmd_Cancel" transform="bool false" pipe="editing" />
 
-    <sensor cmd="cmd_Submit" filter="hasText" transform="read item" pipe="cmd_Update" />
-    <sensor cmd="cmd_Submit" filter="isEmpty" transform="read item" pipe="cmd_DestroyTodo" />
-    <sensor cmd="cmd_Cancel" pipe="cmd_Refresh" />
-    <sensor cmd="cmd_Update" transform="updateText" pipe="cmd_Refresh" />
+    <command name="cmd_Submit" filter="hasText" transform="read item" pipe="cmd_Update" />
+    <command name="cmd_Submit" filter="isEmpty" transform="read item" pipe="cmd_DestroyTodo" />
+    <command name="cmd_Cancel" pipe="cmd_Refresh" />
+    <command name="cmd_Update" transform="updateText" pipe="cmd_Refresh" />
 
 
 

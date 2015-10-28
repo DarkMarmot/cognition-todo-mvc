@@ -311,17 +311,14 @@
 
             name: extractString(sel, 'name'),
             pipe: extractString(sel, 'pipe'),
-            pipeWhere: extractString(sel, 'pipeWhere', 'first'), // first, last, local, outer -- todo switch to prop based
             filter: extractString(sel, 'filter'),
-            topic: extractString(sel, 'for,on,topic', 'update'),
+            topic: extractString(sel, 'on', 'update'),
             run: extractString(sel, 'run'),
             emit: extractString(sel, 'emit'),
             emitPresent: extractHasAttr(sel, 'emit'),
             emitType: null,
             once: extractBool(sel, 'once'),
-            retain: extractBool(sel, 'retain'),
-            group: extractBool(sel, 'group'),
-            change: extractBool(sel, 'change,distinct,skipDupes', false),
+            change: extractBool(sel, 'change', false),
             extract: extractString(sel, 'extract'),
             transform: extractString(sel, 'transform'),
             transformPresent: extractHasAttr(sel, 'transform'),
@@ -331,8 +328,8 @@
             adaptType: null,
             autorun: false,
             batch: extractBool(sel, 'batch'),
-            keep: extractString(sel, 'keep', 'last'), // first, all, or last
-            need: extractStringArray(sel, 'need,needs'),
+            keep: 'last', // first, all, or last
+            need: extractStringArray(sel, 'need'),
             gather: extractStringArray(sel, 'gather'),
             defer: extractBool(sel, 'defer')
 
@@ -340,9 +337,16 @@
 
         d.watch = [d.name];
 
-        // add watches to the gathering
-        if(d.gather.length > 0)
+        // gather needs and cmd -- only trigger on cmd
+        if(d.gather.length || d.need.length) {
             d.gather.push(d.name);
+
+            for (var i = 0; i < d.need.length; i++) {
+                var need = d.need[i];
+                if (d.gather.indexOf(need) === -1)
+                    d.gather.push(need);
+            }
+        }
 
         d.batch = d.batch || d.run;
         d.group = d.batch; // todo make new things to avoid grouping and batching with positive statements
@@ -416,7 +420,7 @@
         if(d.cmd && d.watch.indexOf(d.cmd) === -1)
             d.watch.push(d.cmd);
 
-        // add watches to the gathering
+        // add watches to the gathering -- if gathering
         if(d.gather.length > 0) {
             for (i = 0; i < d.watch.length; i++) {
                 var watch = d.watch[i];
@@ -798,13 +802,22 @@
 
         arr = decs.sensors = [];
         var sensors = sel.find("sensor");
-        var commands = decs.commands = [];
+        decs.commands = [];
         sensors.each(function(){
             var sensorDef = extractSensorDef($(this));
             arr.push(sensorDef);
             if(sensorDef.cmd)
-                commands.push(sensorDef.cmd);
+                decs.commands.push(sensorDef.cmd);
         });
+
+        var commands = sel.find("command");
+        commands.each(function(){
+            var commandDef = extractCommandDef($(this));
+            arr.push(commandDef);
+            if(commandDef.name)
+                decs.commands.push(commandDef.name);
+        });
+
 
         arr = decs.writes = [];
         var writes = sel.find("write");
@@ -2071,7 +2084,7 @@
 
         if(def.keep){
             if(multiSensor)
-                multiSensor.keep(def.keep)
+                multiSensor.keep(def.keep);
             else
                 sensor.keep(def.keep);
         }

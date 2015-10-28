@@ -1,4 +1,4 @@
-# Framework Name TodoMVC Example
+# Cognition TodoMVC Example
 
 > Short description of the framework provided by the official website.
 
