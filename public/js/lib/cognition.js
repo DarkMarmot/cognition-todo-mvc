@@ -1,7 +1,7 @@
 ;(function($) {
 
     /**
-     * cognition.js (v1.0.3)
+     * cognition.js (v1.0.4)
      *
      * Copyright (c) 2015 Scott Southworth, Landon Barnickle & Contributors
      *
@@ -168,7 +168,7 @@
         });
     };
 
-    ndash.init = function (sel, url){
+    ndash.init = function (sel, url, debugUrl){
 
         var root = ndash.root = new MapItem();
         root.aliasZone = ALIAS_ROOT;
@@ -183,16 +183,10 @@
         if(directions)
             COG_ROOT.demandData('__DIRECTIONS__').write(directions);
 
-        //COG_ROOT.demandData('__DIRECTIONS__').write(
-        //    {
-        //        activeSite: {update: 'eis'},
-        //        //'eis.vendor':{update: 'antk'},
-        //        filterList: {update: [{name: "vendor", optionId: "abcw"}]}
-        //
-        //    });
-
         root.localSel = sel;
         root.createCog({url:url});
+        if(debugUrl)
+            root.createCog({url: debugUrl});
 
     };
 
