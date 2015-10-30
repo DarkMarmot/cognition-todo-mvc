@@ -35,9 +35,12 @@
 
             $('body').on('keydown', function(e){
 
+
                 if(e.altKey && e.which === 71){
                     vis = !vis;
+                    console.log(e);
                     gruePage.write(vis ? 'tree.html' : '');
+                    e.preventDefault();
 
                 }
             });
