@@ -1,0 +1,49 @@
+
+<blueprint>
+    <require url="/js/lib/d3.min.js" />
+
+    <data name="gruePage" prop="true" />
+    <cog find="grue" url="data gruePage" />
+
+</blueprint>
+
+<display>
+
+    <div id="grue" style="width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 1; pointer-events: none;" ></div>
+
+</display>
+
+<script>
+
+    $.cog({
+
+        getRoot: function(){
+
+            var root = this.mapItem;
+            while(root.parent){
+                root = root.parent;
+            }
+            return root;
+
+        },
+
+        init: function() {
+
+
+            var vis = false;
+           var gruePage = this.gruePage;
+
+            $('body').on('keydown', function(e){
+
+                if(e.altKey && e.which === 71){
+                    vis = !vis;
+                    gruePage.write(vis ? 'tree.html' : '');
+
+                }
+            });
+
+
+        }
+    });
+
+</script>

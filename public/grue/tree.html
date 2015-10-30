@@ -1,7 +1,4 @@
 
-<blueprint>
-    <require url="/js/lib/d3.min.js" />
-</blueprint>
 
 <display>
     <style type="text/css">
@@ -12,7 +9,7 @@
 
         .node circle {
             fill: #fff;
-            stroke: steelblue;
+            stroke: rgba(45, 152, 106, 0.9);
             stroke-width: 1.5px;
         }
 
@@ -24,14 +21,14 @@
 
         .link {
             fill: none;
-            stroke: #ccc;
+            stroke: rgba(45, 152, 106, 0.7);
             stroke-width: 1.5px;
         }
 
 
     </style>
-    <div id="grueHolder" style="visibility: hidden; width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 1;
-    background-color: rgba(0,0,0,.6)" >
+    <div id="grueHolder" style="width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 1;
+    background-color: rgba(0,0,0,.7); pointer-events: all;" >
         <svg id="svg">
             <g id="g"></g>
         </svg>
@@ -42,23 +39,48 @@
 
     $.cog({
 
+        getRoot: function(){
+
+            var root = this.mapItem;
+            while(root.parent){
+                root = root.parent;
+            }
+            return root;
+
+        },
+
         init: function() {
 
-            var vis = false;
-            var grueHolder = this.grueHolder;
-            $('body').on('keydown', function(e){
+            var cogRoot = this.getRoot();
+            var treeRoot = {name: 'cognition', children: []};
 
-                if(e.altKey && e.which === 71){
-                    vis = !vis;
-                    grueHolder.css('visibility', vis ? 'visible' : 'hidden');
+            console.log('grue:',this.getRoot());
+
+            function lastChunk(url){
+                if(!url) return null;
+                var chunks = url.split('/');
+                return chunks[chunks.length-1].split('.')[0];
+            }
+
+            function noteChildren(cogNode, treeBranch){
+
+                for(var id in cogNode.childMap){
+                    var child = cogNode.childMap[id];
+                    var name = lastChunk(child.resolvedUrl);
+                    if(name) {
+                        var branch = {name: name, children: []};
+                        treeBranch.children.push(branch);
+                        noteChildren(child, branch);
+                    } else {
+                        noteChildren(child, treeBranch);
+                    }
                 }
-            });
+            }
 
-            var treeData = {name: 'cognition', children: [
-                {name: 'test1'},
-                {name: 'test2'},
-                {name: 'test3'}
-            ]};
+            noteChildren(cogRoot, treeRoot);
+
+            console.log('tree:' , treeRoot);
+
 
             var viewerWidth = this.grueHolder.width();
             var viewerHeight = this.grueHolder.height();
@@ -82,7 +104,7 @@
             var panSpeed = 200;
             var i = 0;
             var duration = 750;
-            var root = treeData;
+            var root = treeRoot;
             root.x0 = viewerHeight / 2;
             root.y0 = 0;
 
@@ -98,7 +120,7 @@
             // Layout the tree initially and center on the root node.
             // Call visit function to establish maxLabelLength
 
-            visit(treeData, function (d) {
+            visit(treeRoot, function (d) {
                 totalNodes++;
                 maxLabelLength = Math.max(d.name.length, maxLabelLength);
 
@@ -137,8 +159,7 @@
                         translateX = translateCoords.translate[0];
                         translateY = direction == 'up' ? translateCoords.translate[1] + speed : translateCoords.translate[1] - speed;
                     }
-                    scaleX = translateCoords.scale[0];
-                    scaleY = translateCoords.scale[1];
+
                     scale = zoomListener.scale();
                     svgGroup.transition().attr("transform", "translate(" + translateX + "," + translateY + ")scale(" + scale + ")");
                     d3.select(domNode).select('g.node').attr("transform", "translate(" + translateX + "," + translateY + ")");
@@ -150,24 +171,6 @@
                 }
             }
 
-
-
-
-            function collapse(d) {
-                if (d.children) {
-                    d._children = d.children;
-                    d._children.forEach(collapse);
-                    d.children = null;
-                }
-            }
-
-            function expand(d) {
-                if (d._children) {
-                    d.children = d._children;
-                    d.children.forEach(expand);
-                    d._children = null;
-                }
-            }
 
             // Function to center node when clicked/dropped so node doesn't get lost when collapsing/moving with large amount of children.
 
