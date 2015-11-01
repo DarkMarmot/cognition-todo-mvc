@@ -1,7 +1,7 @@
 ;(function($) {
 
     /**
-     * cognition.js (v1.0.4)
+     * cognition.js (v1.0.5)
      *
      * Copyright (c) 2015 Scott Southworth, Landon Barnickle & Contributors
      *
@@ -873,7 +873,11 @@
         this.cogZone = null;
         this.aliasZone = null;
         this.origin = null; // hosting cog if this is an alloy
+
         this.isAlloy = false;
+        this.isChain = false;
+        this.isPinion = false;
+
         this.path = null; // local directory
         this.localSel = null;
         this.scriptData = Object.create(defaultScriptDataPrototype);
@@ -1176,6 +1180,7 @@
 
         } else {
 
+            mi.isPinion = true;
             mi._requirementsLoaded = true;
             mi.targetSel = (mi.target) ? self.scriptData[mi.target] : self.localSel.last();
             mi.urlFromPlace = mi.findData(mi.url).on('update').change().as(mi).host(mi.uid).run(mi._cogControlUrl).autorun();

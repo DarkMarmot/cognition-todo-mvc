@@ -7,11 +7,11 @@
             cursor: pointer;
         }
 
-        .node circle {
-            fill: #fff;
-            stroke: rgba(45, 152, 106, 0.9);
-            stroke-width: 1.5px;
-        }
+        /*.node circle {*/
+            /*fill: #fff;*/
+            /*stroke: rgba(45, 152, 106, 0.9);*/
+            /*stroke-width: 1.5px;*/
+        /*}*/
 
         .node text {
             fill: white;
@@ -52,7 +52,7 @@
         init: function() {
 
             var cogRoot = this.getRoot();
-            var treeRoot = {name: 'cognition', children: []};
+            var treeRoot = {label: 'cognition', type: 'cog', cog: cogRoot, children: []};
 
             console.log('grue:',this.getRoot());
 
@@ -62,14 +62,38 @@
                 return chunks[chunks.length-1].split('.')[0];
             }
 
+            function getCogDisplayInfo(cog, parentDisplay){
+
+                var name = cog.name || cog.target;
+                var file = lastChunk(cog.resolvedUrl);
+                var label = (name && file && name !== file) ? name + ':' + file : name || file;
+
+                if(cog.isChain)
+                    return {label: label, type: 'chain', cog: cog, children: [], parentDisplay: parentDisplay};
+                if(cog.isAlloy)
+                    return {label: label, type: 'alloy', cog: cog, children: [], parentDisplay: parentDisplay};
+                if(cog.parent && cog.parent.isPinion)
+                    return {label: label, type: 'pinion', cog: cog, children: [], parentDisplay: parentDisplay};
+                if(cog.isPinion)
+                    return {label: label, type: 'hidden', cog: cog, children: [], parentDisplay: parentDisplay};
+
+                return {label: label, type: 'cog', cog: cog, children: [], parentDisplay: parentDisplay};
+            }
+
             function noteChildren(cogNode, treeBranch){
 
                 for(var id in cogNode.childMap){
                     var child = cogNode.childMap[id];
-                    var name = lastChunk(child.resolvedUrl);
-                    if(name) {
-                        var branch = {name: name, children: []};
-                        treeBranch.children.push(branch);
+
+                    var branch = getCogDisplayInfo(child, treeBranch);
+                    if(branch.label === 'grue') continue;
+
+                    var attachBranch = treeBranch;
+                    if(branch.type !== 'hidden') {
+                       // if(branch.type === 'alloy' ){
+                            while(attachBranch.type === 'alloy'){ attachBranch = attachBranch.parentDisplay; }
+                       // }
+                        attachBranch.children.push(branch);
                         noteChildren(child, branch);
                     } else {
                         noteChildren(child, treeBranch);
@@ -116,20 +140,19 @@
                         return [d.y, d.x];
                     });
 
-
             // Layout the tree initially and center on the root node.
             // Call visit function to establish maxLabelLength
 
             visit(treeRoot, function (d) {
                 totalNodes++;
-                maxLabelLength = Math.max(d.name.length, maxLabelLength);
+                maxLabelLength = Math.max(d.label.length, maxLabelLength);
 
             }, function (d) {
                 return d.children && d.children.length > 0 ? d.children : null;
             });
+
             update(root);
             centerNode(root);
-
 
             function visit(parent, visitFn, childrenFn) {
                 if (!parent) return;
@@ -233,6 +256,45 @@
                 var nodes = tree.nodes(root).reverse(),
                         links = tree.links(nodes);
 
+                console.log('links1:',links);
+
+                links = alloyLinksAsSiblings(links);
+
+                console.log('links2:',links);
+
+                function alloyLinksAsSiblings(links) {
+
+                    return links.map(function (link) {
+
+
+                        //if (link.target.type !== 'alloy') return link;
+                        var children = link.source.children;
+                        var j = children.indexOf(link.target);
+                        if (j === 0) return link;
+                        var priorTarget = children[j - 1];
+                        if (priorTarget.type !== 'alloy') return link;
+                        return {source: priorTarget, target: link.target};
+                    });
+
+                }
+
+
+
+
+
+
+
+
+
+                function generateLinks2(nodes) {
+                    return d3.merge(nodes.map(function(parent) {
+                        return (parent.children || []).map(function(child) {
+                            return {source: parent, target: child};
+                        });
+                    }));
+                }
+
+
                 // Set widths between levels based on maxLabelLength.
                 nodes.forEach(function (d) {
                     d.y = (d.depth * (maxLabelLength * 10)); //maxLabelLength * 10px
@@ -258,13 +320,32 @@
                 nodeEnter.append("circle")
                         .attr('class', 'nodeCircle')
                         .attr("r", 0)
-                        .style("fill", function (d) {
-                            return d._children ? "lightsteelblue" : "#fff";
-                        });
+                        .style('stroke', 'rgb(69, 173, 128)')
+                        .style('stroke-width', '2px')
+                        .style('fill', 'rgb(48, 142, 101)');
+//                        .style("fill", function (d) {
+//                            return d._children ? "lightsteelblue" : "#fff";
+//                        });
+
+                var iconTypes = {cog: '\uf013', alloy: '\uf1b2', chain: '\uf0c1', pinion: '\uf085'}
+                function toIcon(d){
+                    return iconTypes[d.type];
+                }
+
+                nodeEnter.append('text')
+                        .attr('name','icon')
+                        .attr('text-anchor', 'middle')
+                        .attr('dominant-baseline', 'central')
+                        .style('font-family', 'FontAwesome')
+                        .attr('font-size', '28px')
+                        .style('fill', '#7EEF90')
+                        .style('text-shadow', '2px 2px 4px rgb(0,0,0)')
+                        .text(toIcon);
 
                 nodeEnter.append("text")
+                        .attr('name','title')
                         .attr("x", function (d) {
-                            return d.children || d._children ? -10 : 10;
+                            return d.children || d._children ? -11 : 11;
                         })
                         .attr("dy", ".35em")
                         .attr('class', 'nodeText')
@@ -272,29 +353,25 @@
                             return d.children || d._children ? "end" : "start";
                         })
                         .text(function (d) {
-                            return d.name;
+                            return d.label;
                         })
                         .style("fill-opacity", 0);
 
 
+
                 // Update the text to reflect whether node has children or not.
-                node.select('text')
-                        .attr("x", function (d) {
-                            return d.children || d._children ? -10 : 10;
-                        })
-                        .attr("text-anchor", function (d) {
-                            return d.children || d._children ? "end" : "start";
-                        })
-                        .text(function (d) {
-                            return d.name;
-                        });
+
 
                 // Change the circle fill depending on whether it has children and is collapsed
                 node.select("circle.nodeCircle")
-                        .attr("r", 4.5)
-                        .style("fill", function (d) {
-                            return d._children ? "lightsteelblue" : "#fff";
-                        });
+                        .transition()
+                        .attr('r', function(d){
+                            return d._children ? 8 : 3;
+                        })
+                        .style('fill', 'rgb(48, 142, 101)');
+
+
+
 
                 // Transition nodes to their new position.
                 var nodeUpdate = node.transition()
@@ -304,8 +381,18 @@
                         });
 
                 // Fade the text in
-                nodeUpdate.select("text")
+                nodeUpdate.selectAll("text")
                         .style("fill-opacity", 1);
+
+
+
+//                nodeUpdate.selectAll("text").select('[name=count]')
+//                        .text(function (d) {
+//                            return d._children ? d._children.length : '';
+//                        })
+//                        .style('fill-opacity', function(d) {
+//                            return d._children ? 1 : 0;
+//                        });
 
                 // Transition exiting nodes to the parent's new position.
                 var nodeExit = node.exit().transition()
@@ -318,7 +405,7 @@
                 nodeExit.select("circle")
                         .attr("r", 0);
 
-                nodeExit.select("text")
+                nodeExit.selectAll("text")
                         .style("fill-opacity", 0);
 
                 // Update the links…
@@ -330,6 +417,9 @@
                 // Enter any new links at the parent's previous position.
                 link.enter().insert("path", "g")
                         .attr("class", "link")
+                        .style('fill', 'none')
+                        .style('stroke', 'rgb(48, 142, 101)')
+                        .style('stroke-width', '1.5px')
                         .attr("d", function (d) {
                             var o = {
                                 x: source.x0,
