@@ -1,7 +1,7 @@
 ;(function($) {
 
     /**
-     * cognition.js (v1.0.5)
+     * cognition.js (v1.0.6)
      *
      * Copyright (c) 2015 Scott Southworth, Landon Barnickle & Contributors
      *
@@ -423,10 +423,10 @@
             }
         }
 
-        if(!d.find)
+        if(!d.find && !d.cmd) // && d.watch.length > 0)
             d.autorun = true;
 
-        d.batch = d.batch || (d.watch.length > 1) || d.run; // todo -- allow multiples without batching?
+        d.batch = d.batch || (d.watch.length > 1); // todo -- allow multiples without batching?
         d.group = d.batch; // todo make new things to avoid grouping and batching with positive statements
         d.retain = d.group;
 
@@ -1229,7 +1229,7 @@
 
 
 // todo this is called an Alloy now
-    MapItem.prototype.createShaft = function(def) {
+    MapItem.prototype.createAlloy = function(def) {
 
         // url must be cached/loaded at this point
         var self = this;
@@ -1319,7 +1319,7 @@
             return;
 
         this.sourceVal = this.parent._resolveValueFromType(this.source, this.sourceType);
-        this.itemVal = this._resolveValueFromType(this.item, this.itemType);
+        this.itemVal = this._resolveValueFromType(this.item, this.itemType, true);
 
         if(this.itemType === DATA)
             this.itemVal = this.demandData(this.item);
@@ -1645,7 +1645,7 @@
                 }
             } else if(endsWith(url,".html")) {
                 if(!req.preload)
-                    self.createShaft(req);
+                    self.createAlloy(req);
             }
         }
 
@@ -1900,7 +1900,7 @@
     };
 
 
-    MapItem.prototype.find = function(name, thing, where){
+    MapItem.prototype.find = function(name, thing, where, optional){
 
         thing = thing || 'data';
         where = where || 'first';
@@ -1915,7 +1915,7 @@
         };
 
         var map = mapNames[thing];
-        return this._find(name, map, where);
+        return this._find(name, map, where, optional);
     };
 
 
@@ -2028,7 +2028,12 @@
             //if (actualPlaceNames.length === 0)
             //    return null; // optional places not found
 
-            sensor = mi.cogZone.findData(def.watch, def.where, def.optional).on(def.topic);
+            dataPlace = mi.cogZone.findData(def.watch, def.where, def.optional);
+
+            if(!dataPlace && def.optional)
+                return null;
+
+            sensor = dataPlace.on(def.topic);
             //sensor = bus.location(actualPlaceNames).on(def.topic);
         }
 
@@ -2140,9 +2145,9 @@
     MapItem.prototype.createProp = function(def){
 
         var mi = this;
-        var prop = mi.find(def.find, def.thing, def.where);
+        var prop = mi.find(def.find, def.thing, def.where, def.optional);
 
-        if(prop === undefined && def.optional)
+        if(!prop && def.optional)
             return;
 
         if(prop === undefined && def.thing !== 'config') // todo force optional flag use for config too
@@ -2174,11 +2179,11 @@
     //    return this.cogZone.findData(name, where);
     //};
 
-    MapItem.prototype._find = function(name, map, where) {
+    MapItem.prototype._find = function(name, map, where, optional) {
 
 
         if(map === 'dataMap')
-            return this.cogZone.findData(name, where);
+            return this.cogZone.findData(name, where, optional);
 
         where = where || FIRST; // options: local, first, outer, last
 
@@ -2300,8 +2305,8 @@
         return this._find(name, 'feedMap', where);
     };
 
-    MapItem.prototype.findData = function(name, where){
-        return this._find(name, 'dataMap', where);
+    MapItem.prototype.findData = function(name, where, optional){
+        return this._find(name, 'dataMap', where, optional);
     };
 
     MapItem.prototype.findConfig = function(name, where){
@@ -2352,7 +2357,7 @@
         return value;
     };
 
-    MapItem.prototype._resolveValueFromType = function(value, type){
+    MapItem.prototype._resolveValueFromType = function(value, type, demandIt){
 
         if(!type)
             return value; // assume it is what it is...
@@ -2373,7 +2378,7 @@
             return this.findConfig(value); // todo add error if not found?
 
         if(type === DATA)
-            return this.findData(value);
+            return (demandIt) ? this.demandData(value) : this.findData(value);
 
         if(type === READ) {
             var d = this.findData(value);
@@ -2427,7 +2432,7 @@
 
 
         if (def.inherit) {
-            var ancestor = self._find(name, 'dataMap', 'first');
+            var ancestor = self._find(name, 'dataMap', 'first', true);
             if(ancestor && ancestor.peek()) {
                 value = ancestor.read();
                 inherited = true;
