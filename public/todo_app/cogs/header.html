@@ -1,6 +1,6 @@
 <blueprint>
 
-    <command name="cmd_TextEntry" adapt="trimText" filter="hasText" pipe="cmd_CreateTodo" />
+    <command name="cmd_TextEntry" filter="hasText" pipe="cmd_CreateTodo" />
 
     <sensor node="newTodo" on="keydown" filter="isEnter" transform="trimText" pipe="cmd_TextEntry" />
     <sensor watch="cmd_CreateTodo" run="clearEntry" />
