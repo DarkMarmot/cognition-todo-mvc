@@ -66,7 +66,7 @@
 
                 var name = cog.name || cog.target;
                 var file = lastChunk(cog.resolvedUrl);
-                var label = (name && file && name !== file) ? name + ':' + file : name || file;
+                var label = (name && file && name !== file) ? name : name || file;
 
                 if(cog.isChain)
                     return {label: label, type: 'chain', cog: cog, children: [], parentDisplay: parentDisplay};

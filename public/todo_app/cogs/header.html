@@ -5,19 +5,31 @@
 
     <sensor node="newTodo" on="keydown" filter="isEnter" transform="trimText" pipe="cmd_TextEntry" />
     <sensor watch="cmd_CreateTodo" run="clearEntry" />
-
+    <sensor node="markAll" on="click" transform="toToggle" pipe="cmd_MarkAll" />
     <cog find="markAll" url="buttons/markAllButton.html" />
 
 </blueprint>
 
 
 <display>
-    <span class="fa fa-gear" style="z-index: -1; position: absolute; font-size: 200px;top: -95px;left: -85px;color: rgba(0,0,0,.25);"></span>
-    <div class="id_header">
-        <h1>Cognition</h1>
-        <input id="newTodo" class="id_new-todo" placeholder="What needs to be done?" autofocus>
+    <div style="padding-top: 12px;">
+        <div id="markAll" style="position: absolute; z-index: 3;"></div>
+        <input id="newTodo" style="    padding: 16px 16px 16px 60px;
+    border: none;
+    background: rgb(31, 33, 30);
+    outline-style: none;
+    z-index: 2;
+    box-shadow: inset 0 1px 3px rgba(0,0,0,.5);
+    position: relative;
+    margin: 0;
+    width: 100%;
+    font-size: 24px;
+    line-height: 1.4em;
+    color: #647C55;
+    box-sizing: border-box;" placeholder="What needs to be done?" autofocus>
+
     </div>
-    <div id="markAll" style="position: absolute;"></div>
+
 </display>
 
 
