@@ -1,12 +1,12 @@
 <blueprint>
 
-    <alias name="SERVER_ROOT" url="http://localhost:4000" />
+    <alias name="SERVER_ROOT" url="http://192.168.10.151:3000" />
     <alias name="TODO_CRUD" path="SERVER_ROOT" url="api/todos" />
 
-    <!--<data name="svc_GetTodos" url="TODO_CRUD" params="prop methodGet" request="true" />-->
+    <data name="svc_GetTodos" url="TODO_CRUD" params="prop methodGet" request="true" />
 
-    <!--<sensor watch="svc_GetTodos" transform="toClientFormat" pipe="storage" />-->
-    <!--<sensor watch="svc_GetTodos" on="*" run="debug" />-->
+    <sensor watch="svc_GetTodos" transform="toClientFormat" pipe="storage" />
+    <sensor watch="svc_GetTodos" on="*" run="debug" />
 
     <data name="storage" value="run readLocalStorage"/>
     <data name="storageView" />
