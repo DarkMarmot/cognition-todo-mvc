@@ -1,13 +1,5 @@
 <blueprint>
 
-    <alias name="SERVER_ROOT" url="http://localhost:4000" />
-    <alias name="TODO_CRUD" path="SERVER_ROOT" url="api/todos" />
-
-    <!--<data name="svc_GetTodos" url="TODO_CRUD" params="prop methodGet" request="true" />-->
-
-    <!--<sensor watch="svc_GetTodos" transform="toClientFormat" pipe="storage" />-->
-    <!--<sensor watch="svc_GetTodos" on="*" run="debug" />-->
-
     <data name="storage" value="run readLocalStorage"/>
     <data name="storageView" />
     <data name="activeCount"  />
@@ -33,32 +25,9 @@
 
     $.cog({
 
-        toClientFormat: function(msg){
-
-            return msg.map(function(d){
-
-                var result = {
-                    completed: d.done,
-                    text: d.desc,
-                    timestamp: d.timestamp,
-                    id: d._id
-                };
-                return result;
-
-            });
-
-
-        },
-
-        debug: function(msg, topic, tag) {
-            console.log('svc:', msg, topic, tag);
-        },
-
-
-
         methodGet: {method: 'get'},
 
-        LOCAL_STORAGE_NAME: "todomvc_cognition",
+        LOCAL_STORAGE_NAME: "todo_mvc_cognition",
 
         readLocalStorage: function(){
 

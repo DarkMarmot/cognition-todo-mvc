@@ -1,0 +1,36 @@
+<blueprint>
+
+    <sensor need="isHovering,isActive,options" run="render" />
+
+    <sensor node="btnHolder" on="mouseenter" transform="bool true" pipe="isHovering" optional="true" />
+    <sensor node="btnHolder" on="mouseleave" transform="bool false" pipe="isHovering" optional="true" />
+    <sensor node="btnHolder" on="click" pipe="cmd_Click" optional="true" />
+
+</blueprint>
+
+<display>
+
+    <div id="btnHolder" >
+        <span id="iconHolder" ></span>
+    </div>
+
+</display>
+
+<script>
+
+    $.cog({
+
+        render: function(msg){
+
+            var options = msg.options;
+            var hoverStyle = msg.isHovering ? options.enterStyle : options.leaveStyle;
+            var activeStyle = msg.isActive ? options.onStyle : options.offStyle;
+            this.iconHolder.css(hoverStyle || {});
+            this.iconHolder.css(activeStyle || {});
+
+        }
+
+
+    });
+
+</script>

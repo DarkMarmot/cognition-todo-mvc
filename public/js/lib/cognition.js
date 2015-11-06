@@ -472,44 +472,44 @@
 
     function extractLibraryDef(sel){
         return {
-            url: extractString(sel, 'url'),
+            name: null,
+            url: extractStringArray(sel, 'url'),
             path: extractString(sel, 'path'),
-            isLibrary: true
+            isRoute: false,
+            isAlloy: false,
+            isLibrary: true,
+            isPreload: false,
+            preload: false
         };
     }
 
     function extractPreloadDef(sel){
         return {
-            url: extractString(sel, 'url'),
+            name: null,
+            url: extractStringArray(sel, 'url'),
             path: extractString(sel, 'path'),
+            isRoute: false,
+            isAlloy: false,
+            isLibrary: false,
             isPreload: true,
             preload: true
         };
     }
 
-    function extractWireDef(sel){
+    function extractAlloyDef(sel){
         return {
             url: extractString(sel, 'url'),
             path: extractString(sel, 'path'),
             name: extractString(sel, 'name'),
             isRoute: extractBool(sel, 'route'),
-            isWire: true
+            isAlloy: true,
+            isLibrary: false,
+            isPreload: false,
+            preload: false
         };
     }
 
-    function extractAlloyDef(sel){
 
-        var def = {
-            name: extractString(sel, 'name'),
-            isRoute: extractBool(sel, "route"),
-            url: extractString(sel, 'url'),
-            path: extractString(sel, 'path'),
-            isAlloy: true
-        };
-
-        return def;
-
-    }
 
 
     function extractServiceDef(sel){
@@ -736,7 +736,7 @@
     function extractDeclarations(sel){
 
         var decs = {};
-        var arr, arr2;
+        var arr, urls;
 
         arr = decs.aliases = [];
         var aliases = sel.find("alias");
@@ -841,15 +841,18 @@
         var requires = sel.find("require");
         requires.each(function(){
             var requireDef = extractLibraryDef($(this));
-            arr.push(requireDef);
+            urls = requireDef.url;
+            urls.forEach(function(url){
+                var tempDef = copyProps(requireDef, {});
+                tempDef.url = url;
+                arr.push(tempDef);
+            });
         });
 
         arr = decs.requires;
         var hoists = sel.find("hoist,trait,wire,alloy");
         hoists.each(function(){
-            var hoistDef = extractWireDef($(this));
-            hoistDef.isWire = true;
-            hoistDef.isAlloy = true;
+            var hoistDef = extractAlloyDef($(this));
             arr.push(hoistDef);
         });
 
@@ -857,8 +860,12 @@
         var preloads = sel.find("preload");
         preloads.each(function(){
             var preloadDef = extractPreloadDef($(this));
-            preloadDef.preload = preloadDef.isPreload = true;
-            arr.push(preloadDef);
+            urls = preloadDef.url;
+            urls.forEach(function(url){
+                var tempDef = copyProps(preloadDef, {});
+                tempDef.url = url;
+                arr.push(tempDef);
+            });
         });
 
 

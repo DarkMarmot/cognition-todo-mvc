@@ -1,18 +1,23 @@
 <blueprint>
 
+    <data name="markAllToggle" value="bool false" />
     <command name="cmd_TextEntry" filter="hasText" pipe="cmd_CreateTodo" />
 
     <sensor node="newTodo" on="keydown" filter="isEnter" transform="trimText" pipe="cmd_TextEntry" />
     <sensor watch="cmd_CreateTodo" run="clearEntry" />
 
+    <cog find="markAll" url="buttons/markAllButton.html" />
+
 </blueprint>
 
 
 <display>
+    <span class="fa fa-gear" style="z-index: -1; position: absolute; font-size: 200px;top: -95px;left: -85px;color: rgba(0,0,0,.25);"></span>
     <div class="id_header">
-        <h1>todos</h1>
+        <h1>Cognition</h1>
         <input id="newTodo" class="id_new-todo" placeholder="What needs to be done?" autofocus>
     </div>
+    <div id="markAll" style="position: absolute;"></div>
 </display>
 
 

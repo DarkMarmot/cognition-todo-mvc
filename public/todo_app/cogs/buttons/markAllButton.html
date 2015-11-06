@@ -1,0 +1,36 @@
+<blueprint>
+
+    <sensor watch="markAllToggle" change="true" run="render" />
+
+</blueprint>
+
+<display>
+
+    <span id="iconHolder" class="fa fa-tasks" style="transition: top,text-shadow,color .4s; font-size: 32px; left: 14px; position: absolute;"></span>
+
+</display>
+
+<script>
+
+    $.cog({
+
+        completeStyle: {
+            top: '11px',
+            'color': '#647C55',
+            'text-shadow': '0 3px 9px rgba(0, 0, 0, 0.7)'
+        },
+
+        incompleteStyle: {
+            top: '14px',
+            'color': '#3C4238',
+            'text-shadow': '0 1px 2px rgba(0, 0, 0, 0.7)'
+        },
+
+        render: function(toggle){
+            this.iconHolder.css(toggle ? this.completeStyle : this.incompleteStyle);
+        }
+
+
+    });
+
+</script>

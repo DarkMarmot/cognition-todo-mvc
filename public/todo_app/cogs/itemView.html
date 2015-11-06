@@ -7,13 +7,15 @@
     <sensor watch="item" extract="text" change="true" run="renderText" />
     <sensor watch="item" extract="completed" change="true" run="renderMark" />
 
+    <cog find="markBtn" url="buttons/markButton.html" />
+
 </blueprint>
 
 
 <display>
 
-        <div id="itemView" class="view">
-            <input id="markBtn" class="toggle" type="checkbox" checked />
+        <div id="itemView" class="view" style="display: flex;">
+            <div id="markBtn" style="width: 45px; height: 58px; position: absolute;"></div>
             <label id="itemText"></label>
             <button id="destroyBtn" class="destroy"></button>
         </div>
@@ -26,10 +28,6 @@
 
         renderText: function(msg){
             this.itemText.text(msg);
-        },
-
-        renderMark: function(msg) {
-            this.markBtn.prop("checked", msg);
         }
 
     });

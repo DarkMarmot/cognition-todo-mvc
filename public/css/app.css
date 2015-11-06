@@ -2,6 +2,7 @@ html,
 body {
     margin: 0;
     padding: 0;
+    height: 100%;
 }
 
 button {
@@ -20,11 +21,15 @@ button {
 }
 
 body {
+    /*background: linear-gradient(rgb(39, 110, 140) 0%, rgba(41,184,229,1) 50%, rgba(188,224,238,1) 100%);*/
+    /* background: linear-gradient(rgb(39, 110, 140) 0%, rgba(41,184,229,1) 50%, rgba(188,224,238,1) 100%); */
+    background-image: radial-gradient(ellipse, #376D6D 0%, rgb(6, 84, 97) 50%, #062C2D 95%);
+    height: 100%;
+    margin: 0;
+    background-repeat: no-repeat;
+    background-attachment: fixed;
     font: 14px 'Helvetica Neue', Helvetica, Arial, sans-serif;
     line-height: 1.4em;
-    background: #eaeaea url('../todomvc-common/bg.png');
-    color: #4d4d4d;
-    margin: 0 auto;
     -webkit-font-smoothing: antialiased;
     -moz-font-smoothing: antialiased;
     -ms-font-smoothing: antialiased;
@@ -38,26 +43,17 @@ input[type="checkbox"] {
 }
 
 .id_todoapp {
-    background: #fff;
-    background: rgba(255, 255, 255, 0.9);
+    background: rgb(37, 39, 39);
     margin: 130px 0 40px 0;
-    border: 1px solid #ccc;
+    border: 1px solid rgb(59, 72, 70);
     position: relative;
     border-top-left-radius: 2px;
     border-top-right-radius: 2px;
-    box-shadow: 0 2px 6px 0 rgba(0, 0, 0, 0.2),
-    0 25px 50px 0 rgba(0, 0, 0, 0.15);
+    box-shadow: 0 2px 16px rgba(6, 47, 76, 0.8), 0 15px 50px 0 rgb(1, 17, 31);
 }
 
-.id_todoapp:before {
-    content: '';
-    border-left: 1px solid #f5d6d6;
-    border-right: 1px solid #f5d6d6;
-    width: 2px;
-    position: absolute;
-    top: 0;
-    left: 40px;
-    height: 100%;
+::-webkit-input-placeholder { /* WebKit, Blink, Edge */
+    color: #81a26c;
 }
 
 .id_todoapp input::-webkit-input-placeholder {
@@ -66,7 +62,7 @@ input[type="checkbox"] {
 
 .id_todoapp input::-moz-placeholder {
     font-style: italic;
-    color: #a9a9a9;
+    color: #cdf;
 }
 
 .id_todoapp h1 {
@@ -74,11 +70,11 @@ input[type="checkbox"] {
     top: -120px;
     width: 100%;
     font-size: 70px;
+    font-family: Helvetica Neue;
     font-weight: bold;
     text-align: center;
-    color: #b3b3b3;
-    color: rgba(255, 255, 255, 0.3);
-    text-shadow: -1px -1px rgba(0, 0, 0, 0.2);
+    color: rgb(26, 63, 72);
+    text-shadow: 0px 0px 1px rgba(0, 255, 244, 1),0px 0px 1px rgba(0, 255, 244, 1),0px 1px 16px rgba(0, 255, 244, .4),0px -20px 80px rgb(100, 183, 75),;
     -webkit-text-rendering: optimizeLegibility;
     -moz-text-rendering: optimizeLegibility;
     -ms-text-rendering: optimizeLegibility;
@@ -87,26 +83,8 @@ input[type="checkbox"] {
 }
 
 .id_header {
-    padding-top: 8px;
-    border-radius: inherit;
-}
-
-.id_header:before {
-    content: '';
-    position: absolute;
-    top: 0;
-    right: 0;
-    left: 0;
-    height: 15px;
-    z-index: 2;
-    border-bottom: 1px solid #6c615c;
-    background: #8d7d77;
-    background: -webkit-gradient(linear, left top, left bottom, from(rgba(132, 110, 100, 0.8)),to(rgba(101, 84, 76, 0.8)));
-    background: -webkit-linear-gradient(top, rgba(132, 110, 100, 0.8), rgba(101, 84, 76, 0.8));
-    background: linear-gradient(top, rgba(132, 110, 100, 0.8), rgba(101, 84, 76, 0.8));
-    filter: progid:DXImageTransform.Microsoft.gradient(GradientType=0,StartColorStr='#9d8b83', EndColorStr='#847670');
-    border-top-left-radius: 1px;
-    border-top-right-radius: 1px;
+    padding-top: 6px;
+    /* border-radius: 4px; */
 }
 
 .id_new-todo,
@@ -137,15 +115,15 @@ input[type="checkbox"] {
 .id_new-todo {
     padding: 16px 16px 16px 60px;
     border: none;
-    background: rgba(0, 0, 0, 0.02);
+    background: rgb(31, 33, 30);
     z-index: 2;
-    box-shadow: none;
+    box-shadow: inset 0px 1px 3px rgba(0,0,0,.5);
 }
 
 .id_main {
     position: relative;
     z-index: 2;
-    border-top: 1px dotted #adadad;
+    border-top: 1px solid #2D525D;
 }
 
 .id_toggle-all {
@@ -173,12 +151,15 @@ input[type="checkbox"] {
     margin: 0;
     padding: 0;
     list-style: none;
+    background: linear-gradient(to right, rgb(30, 33, 26) 0%, rgb(50, 60, 46) 20%, rgb(52, 60, 49) 80%, rgb(31, 33, 29) 100%);
 }
 
 .id_todo-list li {
     position: relative;
+    background: linear-gradient(to bottom, rgba(50, 99, 4, 0) 0%, rgba(7, 27, 1, 0) 90%, rgba(31, 35, 27, 0.39) 100%);
     font-size: 24px;
-    border-bottom: 1px dotted #ccc;
+    color: rgb(40, 111, 175);
+    border-bottom: 1px solid rgb(51, 70, 76);
 }
 
 .id_todo-list li:last-child {
@@ -219,17 +200,16 @@ input[type="checkbox"] {
 }
 
 .id_todo-list li .toggle:after {
-    content: '✔';
-    /* 40 + a couple of pixels visual adjustment */
+    content: '✔';/* 40 + a couple of pixels visual adjustment */
     line-height: 43px;
     font-size: 20px;
-    color: #d9d9d9;
-    text-shadow: 0 -1px 0 #bfbfbf;
+    color: rgb(98, 101, 85);
+    /* text-shadow: 0 -1px 0 #bfbfbf; */
 }
 
 .id_todo-list li .toggle:checked:after {
-    color: #85ada7;
-    text-shadow: 0 1px 0 #669991;
+    color: #353837;
+    text-shadow: 0 1px 0 #131514;
     bottom: 1px;
     position: relative;
 }
@@ -240,13 +220,14 @@ input[type="checkbox"] {
     padding: 15px 60px 15px 15px;
     margin-left: 45px;
     display: block;
+    color: rgb(119, 171, 164);
     line-height: 1.2;
     -webkit-transition: color 0.4s;
     transition: color 0.4s;
 }
 
 .id_todo-list li.completed label {
-    color: #a9a9a9;
+    color: rgba(193, 190, 174, 0.3);
     text-decoration: line-through;
 }
 
@@ -260,14 +241,13 @@ input[type="checkbox"] {
     height: 40px;
     margin: auto 0;
     font-size: 22px;
-    color: #a88a8a;
+    color: #239871;
     -webkit-transition: all 0.2s;
     transition: all 0.2s;
 }
 
 .id_todo-list li .destroy:hover {
-    text-shadow: 0 0 1px #000,
-    0 0 10px rgba(199, 107, 107, 0.8);
+    text-shadow: 0 0 1px #000,     0 5px 10px rgb(3, 37, 26);
     -webkit-transform: scale(1.3);
     -ms-transform: scale(1.3);
     transform: scale(1.3);
@@ -299,6 +279,7 @@ input[type="checkbox"] {
     height: 20px;
     z-index: 1;
     text-align: center;
+    /* background: red; */
 }
 
 .id_footer:before {
@@ -309,11 +290,7 @@ input[type="checkbox"] {
     left: 0;
     height: 50px;
     z-index: -1;
-    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.3),
-    0 6px 0 -3px rgba(255, 255, 255, 0.8),
-    0 7px 1px -3px rgba(0, 0, 0, 0.3),
-    0 43px 0 -6px rgba(255, 255, 255, 0.8),
-    0 44px 2px -6px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 1px 1px rgb(38, 42, 36),     0 6px 0 -3px rgb(52, 60, 49),     0 7px 1px -3px rgba(0, 0, 0, 0.3),     0 43px 0 -6px rgb(30, 35, 28),     0 44px 2px -6px rgba(0, 0, 0, 0.2);
 }
 
 .id_todo-count {
@@ -335,7 +312,7 @@ input[type="checkbox"] {
 }
 
 .id_filters li a {
-    color: #83756f;
+    color: #7B7F6F;
     margin: 2px;
     text-decoration: none;
 }
@@ -363,9 +340,9 @@ input[type="checkbox"] {
 
 .id_info {
     margin: 65px auto 0;
-    color: #a6a6a6;
+    color: rgb(65, 116, 124);
     font-size: 12px;
-    text-shadow: 0 1px 0 rgba(255, 255, 255, 0.7);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
     text-align: center;
 }
 
@@ -373,179 +350,3 @@ input[type="checkbox"] {
     color: inherit;
 }
 
-/*
-	Hack to remove background from Mobile Safari.
-	Can't use it globally since it destroys checkboxes in Firefox and Opera
-*/
-
-@media screen and (-webkit-min-device-pixel-ratio:0) {
-    .id_toggle-all,
-    .id_todo-list li .toggle {
-        background: none;
-    }
-
-    .id_todo-list li .toggle {
-        height: 40px;
-    }
-
-    .id_toggle-all {
-        top: -56px;
-        left: -15px;
-        width: 65px;
-        height: 41px;
-        -webkit-transform: rotate(90deg);
-        -ms-transform: rotate(90deg);
-        transform: rotate(90deg);
-        -webkit-appearance: none;
-        appearance: none;
-    }
-}
-
-.hidden {
-    display: none;
-}
-
-hr {
-    margin: 20px 0;
-    border: 0;
-    border-top: 1px dashed #C5C5C5;
-    border-bottom: 1px dashed #F7F7F7;
-}
-
-.learn a {
-    font-weight: normal;
-    text-decoration: none;
-    color: #b83f45;
-}
-
-.learn a:hover {
-    text-decoration: underline;
-    color: #787e7e;
-}
-
-.learn h3,
-.learn h4,
-.learn h5 {
-    margin: 10px 0;
-    font-weight: 500;
-    line-height: 1.2;
-    color: #000;
-}
-
-.learn h3 {
-    font-size: 24px;
-}
-
-.learn h4 {
-    font-size: 18px;
-}
-
-.learn h5 {
-    margin-bottom: 0;
-    font-size: 14px;
-}
-
-.learn ul {
-    padding: 0;
-    margin: 0 0 30px 25px;
-}
-
-.learn li {
-    line-height: 20px;
-}
-
-.learn p {
-    font-size: 15px;
-    font-weight: 300;
-    line-height: 1.3;
-    margin-top: 0;
-    margin-bottom: 0;
-}
-
-.quote {
-    border: none;
-    margin: 20px 0 60px 0;
-}
-
-.quote p {
-    font-style: italic;
-}
-
-.quote p:before {
-    content: '“';
-    font-size: 50px;
-    opacity: .15;
-    position: absolute;
-    top: -20px;
-    left: 3px;
-}
-
-.quote p:after {
-    content: '”';
-    font-size: 50px;
-    opacity: .15;
-    position: absolute;
-    bottom: -42px;
-    right: 3px;
-}
-
-.quote footer {
-    position: absolute;
-    bottom: -40px;
-    right: 0;
-}
-
-.quote footer img {
-    border-radius: 3px;
-}
-
-.quote footer a {
-    margin-left: 5px;
-    vertical-align: middle;
-}
-
-.speech-bubble {
-    position: relative;
-    padding: 10px;
-    background: rgba(0, 0, 0, .04);
-    border-radius: 5px;
-}
-
-.speech-bubble:after {
-    content: '';
-    position: absolute;
-    top: 100%;
-    right: 30px;
-    border: 13px solid transparent;
-    border-top-color: rgba(0, 0, 0, .04);
-}
-
-.learn-bar > .learn {
-    position: absolute;
-    width: 272px;
-    top: 8px;
-    left: -300px;
-    padding: 10px;
-    border-radius: 5px;
-    background-color: rgba(255, 255, 255, .6);
-    -webkit-transition-property: left;
-    transition-property: left;
-    -webkit-transition-duration: 500ms;
-    transition-duration: 500ms;
-}
-
-@media (min-width: 899px) {
-    .learn-bar {
-        width: auto;
-        margin: 0 0 0 300px;
-    }
-
-    .learn-bar > .learn {
-        left: 8px;
-    }
-
-    .learn-bar #todoapp {
-        width: 550px;
-        margin: 130px auto 40px auto;
-    }
-}
