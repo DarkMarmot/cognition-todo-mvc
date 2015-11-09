@@ -305,6 +305,7 @@
 
             name: extractString(sel, 'name'),
             pipe: extractString(sel, 'pipe'),
+            toggle: extractString(sel, 'toggle'),
             filter: extractString(sel, 'filter'),
             topic: extractString(sel, 'on', 'update'),
             run: extractString(sel, 'run'),
@@ -373,6 +374,7 @@
             where: extractString(sel, 'where', 'first'),
             thing: extractString(sel, 'is', 'data'), // data, feed, service
             pipe: extractString(sel, 'pipe'),
+            toggle: extractString(sel, 'toggle'),
             demand: extractString(sel, 'demand'),
             pipeWhere: extractString(sel, 'pipeWhere', 'first'), // first, last, local, outer -- todo switch to prop based
             filter: extractString(sel, 'filter'),
@@ -2114,6 +2116,10 @@
         else if(def.pipe) {
             pipePlace = mi._find(def.pipe, 'dataMap', def.pipeWhere);
             sensor.pipe(pipePlace);
+        } else if(def.toggle){
+            var togglePlace = mi.cogZone.findData(def.toggle, 'first', def.optional);
+            if(togglePlace)
+                sensor.run(function(){ togglePlace.toggle();});
         }
 
         if(def.run && !def.demand && !def.pipe) {

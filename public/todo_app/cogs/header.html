@@ -1,11 +1,10 @@
 <blueprint>
 
-    <data name="markAllToggle" value="bool false" />
     <command name="cmd_TextEntry" filter="hasText" pipe="cmd_CreateTodo" />
 
     <sensor node="newTodo" on="keydown" filter="isEnter" transform="trimText" pipe="cmd_TextEntry" />
     <sensor watch="cmd_CreateTodo" run="clearEntry" />
-    <sensor node="markAll" on="click" transform="toToggle" pipe="cmd_MarkAll" />
+    <sensor node="markAll" on="click" pipe="cmd_MarkAll" />
     <cog find="markAll" url="buttons/markAllButton.html" />
 
 </blueprint>

@@ -7,27 +7,37 @@
 
 <display>
 
-    <span class="id_todo-count" >
-        <strong><span id="activeCountText" class="id_active-count">1</span></strong>
-        <span id="itemLeftText"> item left</span>
-    </span>
+    <div style="
+        display: flex;
+        background-color: #232522;
+        position: relative;
+        top: -10px;
+        padding: 10px 8px 6px 8px;
+        z-index: -1;
+        justify-content: space-between;
+        box-shadow: inset 0 0 10px rgba(0,0,0,.5);">
+        <span class="id_todo-count" >
+            <strong><span id="activeCountText" class="id_active-count">1</span></strong>
+            <span id="itemLeftText"> item left</span>
+        </span>
 
-    <ul class="id_filters" >
-        <li><a id="allBtn" href="#/">All</a></li>
-        <li><a id="activeBtn" href="#/active">Active</a></li>
-        <li><a id="completedBtn" href="#/completed">Completed</a></li>
-    </ul>
+        <ul class="id_filters" >
+            <li><a id="allBtn" href="#/">All</a></li>
+            <li><a id="activeBtn" href="#/active">Active</a></li>
+            <li><a id="completedBtn" href="#/completed">Completed</a></li>
+        </ul>
 
-    <button id="clearCompletedBtn" style="float: right;
-    position: relative;
-    line-height: 20px;
-    text-decoration: none;
-    background: rgba(0, 0, 0, 0.1);
-    font-size: 11px;
-    padding: 0 10px;
-    border-radius: 3px;
-    box-shadow: 0 -1px 0 0 rgba(0, 0, 0, 0.2);border-bottom: 1px solid #30372D;" ></button>
+        <button id="clearCompletedBtn" style="float: right;
+        position: relative;
+        line-height: 20px;
+        text-decoration: none;
+        background: rgba(0, 0, 0, 0.1);
+        font-size: 11px;
+        padding: 0 10px;
+        border-radius: 3px;
+        box-shadow: 0 -1px 0 0 rgba(0, 0, 0, 0.2);border-bottom: 1px solid #30372D;" ></button>
 
+    </div>
 </display>
 
 <script>

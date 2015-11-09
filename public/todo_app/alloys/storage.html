@@ -1,15 +1,19 @@
 <blueprint>
 
-    <data name="storage" value="run readLocalStorage"/>
+    <data name="storage" value="run readLocalStorage" prop="true" />
     <data name="storageView" />
     <data name="activeCount"  />
     <data name="completedCount" />
     <data name="filter" value="noFilter" />
+    <data name="markAllToggleStatus" value="bool false" />
 
     <command name="cmd_MarkTodo" need="storage" transform="markTodo" pipe="storage" />
     <command name="cmd_CreateTodo" need="storage" transform="createTodo" pipe="storage" />
     <command name="cmd_DestroyTodo" need="storage" transform="destroyTodo" pipe="storage" />
-    <command name="cmd_MarkAll" need="storage" transform="markAll" pipe="storage" />
+    <command name="cmd_MarkAll" toggle="markAllToggleStatus" />
+    <command name="cmd_MarkAll" need="markAllToggleStatus,storage" transform="markAll" pipe="storage" />
+
+
     <command name="cmd_ClearCompleted" need="storage" transform="clearCompleted" pipe="storage" />
     <command name="cmd_Refresh" need="storage" extract="storage" pipe="storage" />
 
@@ -18,6 +22,7 @@
     <sensor watch="storage" transform="toCompletedCount" pipe="completedCount" />
 
     <sensor watch="filter" need="storage" transform="filterView" pipe="storageView" />
+
 
 </blueprint>
 
@@ -31,7 +36,8 @@
 
         readLocalStorage: function(){
 
-            return JSON.parse(localStorage.getItem(this.LOCAL_STORAGE_NAME) || '[]');
+            var result = JSON.parse(localStorage.getItem(this.LOCAL_STORAGE_NAME) || '[]');
+            return result;
         },
 
         writeLocalStorage: function(msg){
@@ -47,8 +53,11 @@
 
         markAll: function (msg) {
 
-            return msg.storage.map(function(todo){
-                todo.completed = msg.cmd_MarkAll;
+            var storage = msg.storage;
+            var status = msg.markAllToggleStatus;
+
+            return storage.map(function(todo){
+                todo.completed = status;
                 return todo;
             });
 
@@ -98,8 +107,8 @@
         filterView: function(msg) {
 
             var filterMethod = this[msg.filter];
-            return msg.storage.filter(filterMethod);
-
+            var result = msg.storage.filter(filterMethod);
+            return result;
         }
 
     });
