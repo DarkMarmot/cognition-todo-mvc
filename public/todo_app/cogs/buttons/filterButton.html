@@ -1,0 +1,26 @@
+<blueprint>
+
+    <adapter follow="show" />
+    <sensor watch="show,button" run="render" />
+
+</blueprint>
+
+
+<display>
+    <li style="display: inline;">
+        <a id="link" style="color: #7B7F6F;margin: 2px;text-decoration: none;"></a>
+    </li>
+</display>
+
+<script>
+    $.cog({
+        render: function(msg){
+
+            var b = msg.button;
+            this.link.attr('href', b.href);
+            this.link.css('font-weight', b.value === msg.show ? 'bold' : 'normal');
+            this.link.text(b.title);
+
+        }
+    })
+</script>

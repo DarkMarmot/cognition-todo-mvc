@@ -1,0 +1,23 @@
+
+<blueprint>
+    <chain find="buttonList" source="prop buttons" item="data button" url="buttons/filterButton.html" />
+</blueprint>
+
+
+<display>
+    <ul id="buttonList" style="margin: 0; padding: 0; list-style: none;" ></ul>
+</display>
+
+
+<script>
+    $.cog({
+
+        buttons:  [
+            {title: 'All', value: 'noFilter', href: '#/', show: 'filter'},
+            {title: 'Active', value: 'activeFilter', href: '#/active', show: 'filter'},
+            {title: 'Completed', value: 'completedFilter', href: '#/completed', show: 'filter'}
+        ]
+
+
+    });
+</script>

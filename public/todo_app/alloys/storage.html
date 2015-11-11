@@ -15,6 +15,7 @@
 
     <command name="cmd_ClearCompleted" need="storage" transform="clearCompleted" pipe="storage" />
     <command name="cmd_Refresh" need="storage" extract="storage" pipe="storage" />
+    <command name="cmd_Filter" pipe="filter" />
 
     <sensor watch="storage" run="writeLocalStorage"  />
     <sensor watch="storage" transform="toActiveCount" pipe="activeCount" />

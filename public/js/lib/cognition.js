@@ -465,6 +465,19 @@
         };
     }
 
+    function extractAdapterDef(sel){
+
+        var d =  {
+            name: extractString(sel, 'name'),
+            follow: extractString(sel, 'follow'),
+            control: extractString(sel, 'control')
+        };
+
+        d.name = d.name || d.follow || d.control;
+        return d;
+    }
+
+
     function extractValveDef(sel){
         return {
             allow: extractStringArray(sel, 'allow'),
@@ -747,6 +760,13 @@
             arr.push(aliasDef);
         });
 
+        arr = decs.adapters = [];
+        var adapters = sel.find("adapter");
+        adapters.each(function(){
+            var adapterDef = extractAdapterDef($(this));
+            arr.push(adapterDef);
+        });
+
         arr = decs.valves = [];
         var valves = sel.find("valve");
         valves.each(function(){
@@ -895,6 +915,7 @@
         this.state = null;
         this.name = null;
         this.parent = null;
+        this.adapter = null;
         this.alloys = [];
         this.serviceMap = {};
         this.feedMap = {};
@@ -1023,7 +1044,9 @@
         {name: 'configs', method: 'createConfig2'},
         {name: 'services', method: 'createService'},
         {name: 'feeds', method: 'createFeed'},
-        {name: 'methods', method: 'createMethod'}
+        {name: 'methods', method: 'createMethod'},
+        {name: 'adapters', method: 'createAdapter'}
+
 
     ];
 
@@ -1169,10 +1192,14 @@
         mi.url =  def.url;
         mi.urlType = def.urlType || 'string'; // s = string, c = config, d = data, p = prop
 
+
         mi.path = (def.path) ? self._resolvePath(def.path) : null;
         mi.parent = self;
         mi.scriptData.mapItem = mi;
         self.childMap[mi.uid] = mi;
+
+        if(def.adapter)
+            mi.adapter = this._resolveValueFromType(def.adapter, def.adapterType);
 
 
         if(mi.urlType !== 'data') {
@@ -2428,6 +2455,17 @@
             }
             return method.call(context);
         }
+    };
+
+    MapItem.prototype.createAdapter = function(def){
+
+        var z = this.cogZone;
+        var options = z.findData(this.parent.item).read(); // todo add error crap if this stuff fails
+        var externalName = options[def.follow || def.control];
+        var externalData = z.findData(externalName, 'parent', def.optional); // name of data point to follow or control
+        var data = z.demandData(def.name); // local data point
+        var sensor = def.follow ? externalData.on('update').pipe(data).autorun() : data.on('update').pipe(externalData).autorun();
+
     };
 
     MapItem.prototype.createData = function(def){

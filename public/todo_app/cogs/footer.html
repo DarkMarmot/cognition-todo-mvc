@@ -3,6 +3,8 @@
     <sensor watch="activeCount,completedCount,filter" run="render" />
     <sensor node="clearCompletedBtn" on="click" pipe="cmd_ClearCompleted" />
 
+    <cog find="filterMenu" url="filterMenu.html" />
+
 </blueprint>
 
 <display>
@@ -21,12 +23,13 @@
             <span id="itemLeftText"> item left</span>
         </span>
 
-        <ul class="id_filters" >
+        <ul class="id_filters" style="display: none;" >
             <li><a id="allBtn" href="#/">All</a></li>
             <li><a id="activeBtn" href="#/active">Active</a></li>
             <li><a id="completedBtn" href="#/completed">Completed</a></li>
         </ul>
 
+        <div id="filterMenu" style="position: absolute; width: 100%; text-align: center; left: 0;"></div>
         <button id="clearCompletedBtn" style="float: right;
         position: relative;
         line-height: 20px;
