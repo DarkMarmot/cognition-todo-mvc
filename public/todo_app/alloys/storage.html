@@ -13,7 +13,6 @@
     <command name="cmd_MarkAll" toggle="markAllToggleStatus" />
     <command name="cmd_MarkAll" need="markAllToggleStatus,storage" transform="markAll" pipe="storage" />
 
-
     <command name="cmd_ClearCompleted" need="storage" transform="clearCompleted" pipe="storage" />
     <command name="cmd_Refresh" need="storage" extract="storage" pipe="storage" />
 
@@ -22,7 +21,6 @@
     <sensor watch="storage" transform="toCompletedCount" pipe="completedCount" />
 
     <sensor watch="filter" need="storage" transform="filterView" pipe="storageView" />
-
 
 </blueprint>
 

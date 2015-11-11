@@ -24,11 +24,9 @@ button {
 
 body {
 
-    background-image: radial-gradient(ellipse, #376D6D 0%, rgb(6, 84, 97) 50%, #062C2D 95%);
+    background: fixed no-repeat radial-gradient(ellipse, #376D6D 0%, rgb(6, 84, 97) 50%, #062C2D 95%);
     height: 100%;
     margin: 0;
-    background-repeat: no-repeat;
-    background-attachment: fixed;
     font: 14px 'Helvetica Neue', Helvetica, Arial, sans-serif;
     line-height: 1.4em;
     -webkit-font-smoothing: antialiased;
@@ -73,7 +71,7 @@ input::-moz-placeholder {
 
 .id_todo-list li label {
     white-space: pre;
-    word-break: break-word;
+    word-break: break-all;
     padding: 15px 60px 15px 15px;
     margin-left: 45px;
     display: block;
@@ -110,30 +108,13 @@ input::-moz-placeholder {
     transform: scale(1.3);
 }
 
-.id_todo-list li .destroy:after {
-    content: '✖';
-}
 
 .id_todo-list li:hover .destroy {
     display: block;
 }
 
 
-.id_footer:before {
-    content: '';
-    position: absolute;
-    right: 0;
-    bottom: 31px;
-    left: 0;
-    height: 50px;
-    z-index: -1;
-    box-shadow: 0 1px 1px rgb(38, 42, 36),     0 6px 0 -3px rgb(52, 60, 49),     0 7px 1px -3px rgba(0, 0, 0, 0.3),     0 43px 0 -6px rgb(30, 35, 28),     0 44px 2px -6px rgba(0, 0, 0, 0.2);
-}
 
-.id_todo-count {
-    float: left;
-    text-align: left;
-}
 
 .id_filters {
     margin: 0;
