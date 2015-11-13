@@ -54,8 +54,6 @@
             var cogRoot = this.getRoot();
             var treeRoot = {label: 'cognition', type: 'cog', cog: cogRoot, children: []};
 
-            console.log('grue:',this.getRoot());
-
             function lastChunk(url){
                 if(!url) return null;
                 var chunks = url.split('/');
@@ -103,9 +101,6 @@
 
             noteChildren(cogRoot, treeRoot);
 
-            console.log('tree:' , treeRoot);
-
-
             var viewerWidth = this.grueHolder.width();
             var viewerHeight = this.grueHolder.height();
 
@@ -130,7 +125,7 @@
             var duration = 750;
             var root = treeRoot;
             root.x0 = viewerHeight / 2;
-            root.y0 = 0;
+            root.y0 = viewerWidth / 2;
 
             var tree = d3.layout.tree()
                     .size([viewerHeight, viewerWidth]);
@@ -248,6 +243,7 @@
                         });
                     }
                 };
+
                 childCount(0, root);
                 var newHeight = d3.max(levelWidth) * 25; // 25 pixels per line
                 tree = tree.size([newHeight, viewerWidth]);
@@ -256,11 +252,9 @@
                 var nodes = tree.nodes(root).reverse(),
                         links = tree.links(nodes);
 
-                console.log('links1:',links);
 
                 links = alloyLinksAsSiblings(links);
 
-                console.log('links2:',links);
 
                 function alloyLinksAsSiblings(links) {
 

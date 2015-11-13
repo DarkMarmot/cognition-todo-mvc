@@ -1,7 +1,7 @@
 ;(function($) {
 
     /**
-     * cognition.js (v1.0.6)
+     * cognition.js (v1.0.7)
      *
      * Copyright (c) 2015 Scott Southworth, Landon Barnickle & Contributors
      *
