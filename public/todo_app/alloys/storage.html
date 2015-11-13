@@ -1,22 +1,45 @@
+<!-- storage alloy contians the data point for the saved todo items,
+     the commands to act on those items, and the integration with the browser
+     local storage
+-->
 <blueprint>
+    <!-- local observable data points -->
 
+    <!-- storage runs the "readLocalStorage" local method to get a default value
+         stores the array of saved to do objects
+     -->
     <data name="storage" value="run readLocalStorage"  />
     <data name="storageView" />
     <data name="activeCount"  />
     <data name="completedCount" />
-    <data name="filter" value="noFilter" />
+    <data name="filter" value="noFilter" /> <!-- default string value -->
 
+    <!-- commands are a combination data pint and sensor used as a shortcut when a data
+         point and sensor are tightly coupled. At their simplest that execute a function
+         on data change and pass the data value to the function.
+    -->
+    <!-- when cmd_MarkTodo data is set (to a to do item) toggle the completed status
+         via "markTodo" and update the storage array. The storage data point must
+         exist or the command will abort. Needed items will be combined with the command's
+         data value into a new object.
+    -->
     <command name="cmd_MarkTodo" need="storage" transform="markTodo" pipe="storage" />
     <command name="cmd_CreateTodo" need="storage" transform="createTodo" pipe="storage" />
     <command name="cmd_DestroyTodo" need="storage" transform="destroyTodo" pipe="storage" />
     <command name="cmd_MarkAll" need="storage" transform="markAll" pipe="storage" />
     <command name="cmd_ClearCompleted" need="storage" transform="clearCompleted" pipe="storage" />
+    <!-- extract is a shortcut transform the pipes a given property from the data point-->
     <command name="cmd_Refresh" need="storage" extract="storage" pipe="storage" />
 
+    <!-- sensor to write the updated storage array to browser localstorage-->
     <sensor watch="storage" run="writeLocalStorage"  />
+    <!-- update the active items count on change to the storage array-->
     <sensor watch="storage" transform="toActiveCount" pipe="activeCount" />
     <sensor watch="storage" transform="toCompletedCount" pipe="completedCount" />
 
+    <!-- choose the sublist of saved todo items to display based on the currently set
+         value for the filter data point
+    -->
     <sensor watch="filter" need="storage" transform="filterView" pipe="storageView" />
 
 </blueprint>
@@ -24,25 +47,39 @@
 <script>
 
     $.cog({
-
+        //local variable
         LOCAL_STORAGE_NAME: "todomvc_cognition",
 
+        //interact with the browser local storage
         readLocalStorage: function(){
-
             return JSON.parse(localStorage.getItem(this.LOCAL_STORAGE_NAME) || '[]');
         },
-
-        writeLocalStorage: function(msg){
+        writeLocalStorage: function(msg){ //msg is pipe array from storage data point
             localStorage.setItem(this.LOCAL_STORAGE_NAME, JSON.stringify(msg));
         },
 
+
+        //todo command actions
+        /**
+         * Delete an item from the stored todo item array
+         * @param msg - { cmd_DestroyTodo: todo item object to delete,
+         *                storage: storage array
+         *              }
+         * @returns [storage] pipe updated storage array to the storage data point
+         */
         destroyTodo: function (msg) {
 
             msg.storage.splice(msg.storage.indexOf(msg.cmd_DestroyTodo), 1);
             return msg.storage;
 
         },
-
+        /**
+         * Create a new todo item and add it to the stroage array
+         * @param msg - { cmd_MarkAll: button click event,
+         *                storage: storage array
+         *              }
+         * @returns [storage] - piped to the storage data point
+         */
         markAll: function (msg) {
 
             return msg.storage.map(function(todo){
@@ -51,16 +88,24 @@
             });
 
         },
-
+        /**
+         * Toggle completed status for an item
+         * @param msg - { cmd_MarkTodo: todo item object ,
+         *                storage: storage array
+         *              }
+         * @returns [storage] pipe updated storage array to the storage data point
+         */
         markTodo: function (msg) {
             msg.cmd_MarkTodo.completed = !msg.cmd_MarkTodo.completed;
             return msg.storage;
         },
-
-        toCount: function(msg){
-            return msg.length;
-        },
-
+        /**
+         * Create a new todo item and add it to the stroage array
+         * @param msg - { cmd_CreateTodo: new todo item text,
+         *                storage: storage array
+         *              }
+         * @returns [storage] - piped to the storage data point
+         */
         createTodo: function (msg) {
 
             var todo = {text: msg.cmd_CreateTodo, completed: false};
@@ -68,31 +113,41 @@
             return msg.storage;
 
         },
-
+        /**
+         * Create a new todo item and add it to the stroage array
+         * @param msg - { cmd_ClearCompleted: button click event,
+         *                storage: storage array
+         *              }
+         * @returns [storage] - piped to the storage data point
+         */
         clearCompleted: function (msg) {
             return msg.storage.filter(this.activeFilter);
         },
 
+        //count tracking methods
+        toCount: function(msg){
+            return msg.length;
+        },
         toCompletedCount: function(msg){
             return msg.filter(this.completedFilter).length;
         },
-
         toActiveCount: function(msg){
             return msg.filter(this.activeFilter).length;
         },
 
+        // three todo array filter methods
         completedFilter: function (d) {
             return d.completed;
         },
-
         activeFilter: function (d) {
             return !d.completed;
         },
-
         noFilter: function(){
             return true;
         },
 
+        //filter the todo array with the selected filter method
+        //and pipe the new array to the storage View data point
         filterView: function(msg) {
 
             var filterMethod = this[msg.filter];

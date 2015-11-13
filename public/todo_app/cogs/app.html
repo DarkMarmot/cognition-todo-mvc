@@ -1,6 +1,21 @@
+<!-- Cogs are encapsulated component definitions composed of 3 root tags.
+    blueprint - contians conginition framework specific html style tags.
+                These tags provide declarative funcitonality and allow communitcation with
+                and instantiation of other cogs.
+    display   - is the html template for the cog in regulate HTML.
+                THe HTML will be created as written in the cog's continer except for "id"
+                attrubutes which will be changed to unique values for the application.
+                Selctors for each id object will be loaded into the cog's "this" scope
+                and accessible in the script tag.
+    script    - defines the cog's local methods. By default the "init" and "destroy"
+                methods are called on cog creation and destruction. Other methods are called
+                via the tags in the blueprint scetion or from other methods.
+-->
 <blueprint>
 
-    <!-- preload ensures the following cogs will be downloaded before the init method for this cog is called, this can improve page renders   -->
+    <!-- preload ensures the following cogs will be downloaded before the init method for this cog is called
+         and be available immeadiately at render time overriding the default lazy download.
+    -->
     <preload url="footer.html" />
     <preload url="header.html" />
     <preload url="main.html" />
@@ -8,21 +23,27 @@
     <preload url="itemEdit.html" />
     <preload url="itemView.html" />
 
-    <!-- alloys are function only cogs that are loaded above this cog in the cog tree
-        functions and data points in alloys will be accessible from this cog
+    <!-- alloys are function only cogs that are loaded above this cog in the cog tree.
+        Functions and data points in alloys will be accessible from this cog.
     -->
     <alloy url="../alloys/storage.html" />
     <alloy url="../alloys/routes.html" />
 
-    <!-- this sensor watches the storage data point in the storage alloy above
-        Sensors normally fire on any data change,
-        however, this one will convert how it view the data with the "hasItems" function (below)
-        and the run "render" function if the converted data changes
-        In this case, it will display the items list if there are saved list items in storage.
+    <!-- sensor tags observe data points and act upon events triggered by that datapoint.
+
+        This sensor watches the storage data point in the storage alloy above.
+
+        Sensors normally fire on a data "change" event,
+        however, this one will "adpat" how it views the data with the "hasItems" function (below).
+        It will call the local "render" function if the converted data changes from false to true.
+
+        In this case, it will display the to do items list only if there are saved items in storage.
     -->
     <sensor watch="storage" adapt="hasItems" change="true" run="render" />
 
-    <!-- load the following cogs into the tags with the given id -->
+    <!-- load the following cogs into the tags with the given id.
+         This is the primary method for loading child cogs.
+    -->
     <cog find="main" url="main.html" />
     <cog find="header" url="header.html" />
     <cog find="footer" url="footer.html" />
@@ -34,7 +55,7 @@
     <div id="app">
 
         <section class="id_todoapp">
-            <!-- cog with given ids are accessible from the this scope below-->
+            <!-- cog with given ids are accessible from the "this" scope below in the cog script-->
             <!-- ids will change to be unique on render in the browser -->
             <header class="id_header" id="header" ></header>
             <section class="id_main" id="main" ></section>
@@ -51,12 +72,21 @@
 
 </display>
 
-
 <script>
+    //shortcut reference to the cognition framework "$.cog"
     $.cog({
 
+        /**
+         * hasItems is called when the storage observable data point fires a "change" event
+         * @param msg - array of stored tasks
+         * @returns {boolean}
+         */
         hasItems: function(msg) { return msg.length > 0; },
 
+        /**
+         * render is called when the value of hasItems changes
+         * @param msg - boolean (piped from hasItems via sensor)
+         */
         render: function (msg) {
             var style = {visibility: msg ? 'visible' : 'hidden'};
             this.main.css(style);

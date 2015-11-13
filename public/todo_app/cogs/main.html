@@ -1,6 +1,12 @@
 <blueprint>
-
+    <!-- call "MarkAll" command in storage on button click-->
     <sensor node="toggleAll" on="click" transform="toChecked" pipe="cmd_MarkAll" />
+
+    <!-- chain tags take an array and generate a child cog for each item in the array-->
+    <!-- create todo item rows for each todo item in the current storage view
+         pass the item data to the cog in a data point named "item"
+         use the "item.html" cog definition for creting the child cogs
+    -->
     <chain find="list" source="storageView" item="data item" url="item.html" />
 
 </blueprint>

@@ -1,15 +1,24 @@
 <blueprint>
 
+    <!-- key filter actions -->
     <sensor node="entryField" on="keydown" filter="isEscape" pipe="cmd_Cancel" />
     <sensor node="entryField" on="keydown" filter="isEnter" pipe="cmd_Submit" />
+
+    <!-- if "editing" and lostFocus pipe true to the Submit command-->
     <sensor node="entryField" on="blur" adapt="read editing" filter="isTrue" pipe="cmd_Submit" />
 
+    <!-- render when item or editing changes value-->
     <sensor need="item,editing" run="render" />
 
+    <!-- set editing false on submit or cancel-->
     <sensor watch="cmd_Submit,cmd_Cancel" transform="bool false" pipe="editing" />
 
+    <!-- update text on submit if not empty string-->
     <command name="cmd_Submit" filter="hasText" transform="read item" pipe="cmd_Update" />
+    <!-- remove item if text is empty-->
     <command name="cmd_Submit" filter="isEmpty" transform="read item" pipe="cmd_DestroyTodo" />
+
+    <!-- redraw todo list-->
     <command name="cmd_Cancel" pipe="cmd_Refresh" />
     <command name="cmd_Update" transform="updateText" pipe="cmd_Refresh" />
 

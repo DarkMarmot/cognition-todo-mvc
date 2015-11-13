@@ -1,6 +1,11 @@
 <blueprint>
-
+    <!-- run render when a "change" event fires for any on the listed data points -->
     <sensor watch="activeCount,completedCount,filter" run="render" />
+
+    <!-- sensors can also watch html tags of a given "id" for standard events-->
+    <!-- pipe the "click" mouse event to the "cmd_ClearCompleted" command in the panert "storage" alloy
+         when the "clearCompletedBtn" is clicked.
+     -->
     <sensor node="clearCompletedBtn" on="click" pipe="cmd_ClearCompleted" />
 
 </blueprint>
@@ -27,7 +32,7 @@
     $.cog({
 
        render: function(msg){
-
+           //all ids in the template are accessible selectors in script functions as this[id]
            this.allBtn.toggleClass('selected', msg.filter === 'noFilter');
            this.activeBtn.toggleClass('selected', msg.filter === 'activeFilter');
            this.completedBtn.toggleClass('selected', msg.filter === 'completedFilter');

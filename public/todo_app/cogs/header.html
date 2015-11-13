@@ -1,8 +1,14 @@
 <blueprint>
 
+    <!-- pipes the new todo text to the "CreateTodo" command when it is not empty-->
     <command name="cmd_TextEntry" adapt="trimText" filter="hasText" pipe="cmd_CreateTodo" />
 
+    <!-- sensor watchs for the entry of a new todo text and pipes text to the "TextEntry"
+         command when the "isEnter" function returns true
+    -->
     <sensor node="newTodo" on="keydown" filter="isEnter" transform="trimText" pipe="cmd_TextEntry" />
+
+    <!-- cears the input text once it is sent to the todo list-->
     <sensor watch="cmd_CreateTodo" run="clearEntry" />
 
 </blueprint>
@@ -25,6 +31,10 @@
             return ev.which === this.ENTER_KEY;
         },
 
+        /**
+         * use the newTodo seector to get the input value and return the trimmed value
+         * @returns string
+         */
         trimText: function(){
             return this.newTodo.val().trim();
         },

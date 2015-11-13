@@ -1,13 +1,19 @@
-
+<!-- this cog is the item wrapper component for a chain cog
+    it will by default have an "item" data point with the data object from the source array for the chain
+-->
 <blueprint>
 
-
+    <!-- stores the cog url for the item display-->
     <data name="itemRenderer" url="itemView.html" />
     <data name="editing" value="false" />
 
+    <!-- sets the url value of "itemRender" when the editing boolean changes-->
     <sensor watch="editing" transform="toUrl" pipe="itemRenderer" />
+
+    <!-- run render when the item, or editing data point changes -->
     <sensor watch="item,editing" run="render" />
 
+    <!-- loads the item view cog based on the url value of the "itemRenderer" data point-->
     <cog find="listItem" url="data itemRenderer" />
 
 </blueprint>
@@ -23,11 +29,19 @@
 <script>
 
     $.cog({
-
+        /**
+         * set the cog to use for todo item display based on whether the item is being edited or not
+         * @param msg boolean value of editing data point
+         * @returns string - url of the cog used to display the item data
+         */
         toUrl: function(msg){
             return msg ? 'itemEdit.html' : 'itemView.html';
         },
 
+        /**
+         * correct the display based on the todo item status
+         * @param msg
+         */
         render: function(msg){
 
                 this.listItem.toggleClass("completed", msg.item.completed);

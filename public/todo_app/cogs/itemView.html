@@ -1,10 +1,19 @@
 
 <blueprint>
-
+    <!-- on div id "itemText" double click, pipe "true" to the editing data point-->
     <sensor node="itemText" on="dblclick" transform="bool true" pipe="editing" />
+
+    <!-- on input "markBtn" click pipe the todo item object to the "MarkTodo" command in the storage alloy-->
     <sensor node="markBtn" on="click" transform="read item" pipe="cmd_MarkTodo" />
+
+    <!-- on input "destroyBtn" click pipe the todo item object to the "DestroyTodo" command in the storage alloy-->
     <sensor node="destroyBtn" on="click" transform="read item" pipe="cmd_DestroyTodo" />
+
+    <!-- when the "item" data point changes take the "text" property and pass it to the "renderText" function-->
     <sensor watch="item" extract="text" change="true" run="renderText" />
+
+
+    <!-- when the "item" data point changes take the "completed" property and pass it to the "renderMark" function-->
     <sensor watch="item" extract="completed" change="true" run="renderMark" />
 
 </blueprint>

@@ -1,5 +1,10 @@
+<!-- handles location route changes -->
 <blueprint>
 
+    <!-- the prop tag finds a data point of the given name in a parent cog
+        and makes it available to scripts from the "this" context.
+    -->
+    <!-- get refernce to the filter property in the storage alloy -->
     <prop find="filter" />
 
 </blueprint>
@@ -9,6 +14,10 @@
 
     $.cog({
 
+        /**
+         * on start create a director Router object and create routes that
+         * will update the todo list view based on the given filter name
+         */
         init: function(){
 
             var self = this;
