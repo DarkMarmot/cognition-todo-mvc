@@ -1,5 +1,6 @@
 <blueprint>
 
+    <!-- preload ensures the following cogs will be downloaded before the init method for this cog is called, this can improve page renders   -->
     <preload url="footer.html" />
     <preload url="header.html" />
     <preload url="main.html" />
@@ -7,11 +8,21 @@
     <preload url="itemEdit.html" />
     <preload url="itemView.html" />
 
+    <!-- alloys are function only cogs that are loaded above this cog in the cog tree
+        functions and data points in alloys will be accessible from this cog
+    -->
     <alloy url="../alloys/storage.html" />
     <alloy url="../alloys/routes.html" />
 
+    <!-- this sensor watches the storage data point in the storage alloy above
+        Sensors normally fire on any data change,
+        however, this one will convert how it view the data with the "hasItems" function (below)
+        and the run "render" function if the converted data changes
+        In this case, it will display the items list if there are saved list items in storage.
+    -->
     <sensor watch="storage" adapt="hasItems" change="true" run="render" />
 
+    <!-- load the following cogs into the tags with the given id -->
     <cog find="main" url="main.html" />
     <cog find="header" url="header.html" />
     <cog find="footer" url="footer.html" />
@@ -23,6 +34,8 @@
     <div id="app">
 
         <section class="id_todoapp">
+            <!-- cog with given ids are accessible from the this scope below-->
+            <!-- ids will change to be unique on render in the browser -->
             <header class="id_header" id="header" ></header>
             <section class="id_main" id="main" ></section>
             <footer class="id_footer" id="footer" ></footer>

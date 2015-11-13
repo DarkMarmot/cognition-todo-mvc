@@ -7,18 +7,23 @@
 		<link rel="stylesheet" href="css/app.css">
 	</head>
 	<body>
-
+        <!-- application container -->
         <div id="todo_app"></div>
 
 		<script src="todomvc-common/base.js"></script>
         <script src="js/lib/director.js"></script>
         <script src="js/lib/jquery.js"></script>
+        <!-- catbus is the data router cognition is built on top of -->
         <script src="js/lib/catbus.js"></script>
+        <!-- our framework library-->
         <script src="js/lib/cognition.js"></script>
 
         <script>
 
             $(function(){
+                //Increment the version or build number to ensure fresh cogs are pulled into the browser cache
+                $.cognition.buildNum('1.0.0');
+                //Select the container for your app and the start up cog (go to this file next)
                 $.cognition.init($("#todo_app"), "todo_app/cogs/app.html");
             });
 
