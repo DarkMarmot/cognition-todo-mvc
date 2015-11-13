@@ -1,7 +1,6 @@
 <blueprint>
 
     <command name="cmd_TextEntry" filter="hasText" pipe="cmd_CreateTodo" />
-
     <sensor node="newTodo" on="keydown" filter="isEnter" transform="trimText" pipe="cmd_TextEntry" />
     <sensor watch="cmd_CreateTodo" run="clearEntry" />
     <sensor node="markAll" on="click" pipe="cmd_MarkAll" />
@@ -26,7 +25,6 @@
     line-height: 1.4em;
     color: #647C55;
     box-sizing: border-box;" placeholder="What needs to be done?" autofocus>
-
     </div>
 
 </display>
