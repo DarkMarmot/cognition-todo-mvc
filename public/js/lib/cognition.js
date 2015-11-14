@@ -72,6 +72,11 @@
 
     };
 
+    /**
+     * Set the current build number. Appeded to cog file requets to ensure cache refresh
+     * @param build number string
+     * @returns {cognition}
+     */
     ndash.buildNum = function(n){
         if(arguments.length == 0) return buildNum;
         buildNum = n;
@@ -79,7 +84,10 @@
     };
 
 
-
+    /**
+     * These are the automaticallly called/functions for cogs
+     * @type {{_ids: {}, enter: Function, update: Function, exit: Function, init: Function, start: Function, destroy: Function}}
+     */
     var defaultScriptDataPrototype = {
 
         _ids: {},
@@ -100,6 +108,10 @@
 
     };
 
+    /**
+     * incrementer to ensure html tag ids are unique
+     * @returns {number}
+     */
     function getNextUid(){ return ++uid;}
 
     var activeScriptData = null;
