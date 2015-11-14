@@ -4,7 +4,7 @@ The intensely boring application -- now without MVC!
 
 ## Overview
 
-The TodoMVC application rewritten with the declarative-styled, component-driven **cognition** framework.
+This application is the TodoMVC application rewritten with the declarative-styled, component-driven **cognition** framework.
 
 Cognition is a client side framework designed for building single page web applications on top of a service based
 architecture for data and persistence. Cognition applications are built with encapsulated component definition files called *cogs*.
@@ -13,8 +13,11 @@ Cog definitions are lazy-loaded and instanced into a component object tree. Each
 cogs definitions are compiled and cached on first download.
 
 A cog file is an html format file consisting of three root tags: *blueprint*, *display*, and *script*.
+
 The **blueprint** has all the special cognition framework tags.
+
 The **display** is the component template for the cog.
+
 The **script** contains the local variables and methods for the cog in object format.
 
 ##Important Cognition tags:

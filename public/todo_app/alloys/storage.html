@@ -1,12 +1,13 @@
-<!-- storage alloy contians the data point for the saved todo items,
-     the commands to act on those items, and the integration with the browser
-     local storage
+<!-- The storage alloy contains
+        the data point for the saved todo items,
+        the commands to act on those items and,
+        the functions to integrate to the browser local storage.
 -->
 <blueprint>
     <!-- local observable data points -->
 
-    <!-- storage runs the "readLocalStorage" local method to get a default value
-         stores the array of saved to do objects
+    <!-- "storage" runs the "readLocalStorage" local method to get a default value.
+         This data point stores the array of saved to do objects.
      -->
     <data name="storage" value="run readLocalStorage"  />
     <data name="storageView" />
@@ -14,14 +15,16 @@
     <data name="completedCount" />
     <data name="filter" value="noFilter" /> <!-- default string value -->
 
-    <!-- commands are a combination data point and sensor used as a shortcut when a data
+    <!-- Commands are a combination data point and sensor used as a shortcut when a data
          point and sensor are tightly coupled. At their simplest they execute a function
          on data change and pass the data value to the function.
     -->
-    <!-- when cmd_MarkTodo data is set (to a to do item) toggle the completed status
-         via "markTodo" and update the storage array. The storage data point must
-         exist or the command will abort. Needed items will be combined with the command's
-         data value into a new object.
+    <!-- When cmd_MarkTodo data is set (to a todo item) then toggle the completed status
+         via the "markTodo" function and then update the storage array.
+         The storage data point must exist and have data or the command will not fire.
+
+         Needed items will be combined with the command's
+         data value into a new object hash.
     -->
     <command name="cmd_MarkTodo" need="storage" transform="markTodo" pipe="storage" />
     <command name="cmd_CreateTodo" need="storage" transform="createTodo" pipe="storage" />
