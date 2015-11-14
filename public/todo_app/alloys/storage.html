@@ -47,10 +47,9 @@
 <script>
 
     $.cog({
-        //local variable
+
         LOCAL_STORAGE_NAME: "todomvc_cognition_master",
 
-        //interact with the browser local storage
         readLocalStorage: function(){
             return JSON.parse(localStorage.getItem(this.LOCAL_STORAGE_NAME) || '[]');
         },
