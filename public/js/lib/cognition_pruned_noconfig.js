@@ -3,7 +3,7 @@
     /**
      * cognition.js (v1.0.10-pruned)
      *
-     * Copyright (c) 2015 Scott Southworth, Landon Barnickle, Nick Lorenson & Contributors
+     * Copyright (c) 2015 Scott Southworth, Landon Barnickle & Contributors
      *
      * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this
      * file except in compliance with the License. You may obtain a copy of the License at:
@@ -2292,13 +2292,10 @@
     MapItem.prototype.createAdapter = function(def){
 
         var z = this.cogZone;
-        var itemName = this.parent.isChain ? this.parent.item : this.item; // todo look up why diff on chains - need pinion check?
-        var options = z.findData(itemName).read(); // todo add error crap if this stuff fails
+        var options = z.findData(this.parent.item).read(); // todo add error crap if this stuff fails
         var externalName = options[def.name];
         var externalData = z.findData(externalName, 'parent', def.optional); // name of data point to follow or control
         var data = z.demandData(def.name); // local data point
-
-        if(!externalData) return;
 
         if(def.control){
             data.on('update').pipe(externalData);
