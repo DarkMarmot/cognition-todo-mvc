@@ -1,5 +1,6 @@
 <blueprint>
 
+
     <data name="storage" value="run readLocalStorage" prop="true" />
     <data name="storageView" />
     <data name="activeCount"  />
@@ -29,6 +30,9 @@
 
     $.cog({
 
+        start: function(){
+          console.log('ss:',this.mapItem.findData('cow').read());
+        },
         methodGet: {method: 'get'},
 
         LOCAL_STORAGE_NAME: "todo_mvc_cognition",

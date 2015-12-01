@@ -1,7 +1,7 @@
 ;(function($) {
 
     /**
-     * cognition.js (v1.0.10-pruned)
+     * cognition.js (v1.0.12-downloading)
      *
      * Copyright (c) 2015 Scott Southworth, Landon Barnickle, Nick Lorenson & Contributors
      *
@@ -324,7 +324,6 @@
             data: extractString(sel, 'data'),
             find: extractString(sel, 'id,find,node'), // todo switch all to id
             optional: extractBool(sel, 'optional'),
-            subs: null,
             where: extractString(sel, 'where', 'first'),
             thing: extractString(sel, 'is', 'data'), // data, feed, service
             pipe: extractString(sel, 'pipe'),
@@ -673,7 +672,8 @@
         return {
             name: extractString(sel, 'name'),
             path: extractString(sel, 'path'),
-            url: extractString(sel, 'url')
+            url: extractString(sel, 'url'),
+            prop: extractBool(sel, 'prop')
         };
 
     }
@@ -1209,6 +1209,11 @@
         alloy.name = def.name;
         alloy.isRoute = def.isRoute;
 
+        alloy.source = def.source;
+        alloy.sourceType = def.sourceType || 'prop';
+        alloy.item = def.item;
+        alloy.itemType = def.itemType;
+
         // insert alloy between this cog and its parent
         alloy.parent = self.parent;
         alloy.parent.childMap[alloy.uid] = alloy;
@@ -1275,7 +1280,11 @@
         if(!this.parent)
             return;
 
-        this.sourceVal = this.parent._resolveValueFromType(this.source, this.sourceType);
+
+        this.sourceVal = (this.sourceType !== DATA && this.isAlloy) ?
+            this.origin._resolveValueFromType(this.source, this.sourceType) : // resolve from the declaring cog, not the parent
+            this.parent._resolveValueFromType(this.source, this.sourceType);
+
         this.itemVal = this._resolveValueFromType(this.item, this.itemType, true);
 
         if(this.itemType === DATA)
@@ -1420,11 +1429,17 @@
     MapItem.prototype._cogBecomeUrl = function(){
 
         var mi = this;
+        if(mi.destroyed || !mi.parent || mi.parent.destroyed) return;
 
         var url = mi.resolvedUrl;
         var htmlSel = cacheMap[url];
 
         mi._declarationDefs = declarationMap[url];
+
+        var script = scriptMap[url] || defaultScriptDataPrototype;
+
+        mi.scriptData = Object.create(script);
+        mi.scriptData.mapItem = mi;
 
         if(mi.isAlloy)
             mi._cogInitialize();
@@ -1463,7 +1478,7 @@
         var libs = self._declarationDefs.requires;
         libs.forEach(function (def) {
             def.resolvedUrl = self._resolveUrl(def.url, def.path);
-            self._cogAddRequirement(def.resolvedUrl, def.preload, def.name, def.isRoute);
+            self._cogAddRequirement(def.resolvedUrl, def.preload, def.name, def.isRoute, def);
         });
 
         if(self.requirements.length == 0) {
@@ -1478,13 +1493,13 @@
     MapItem.prototype._cogInitialize = function(){
 
         var mi = this;
-        if(mi.destroyed || !mi.parent || mi.parent.destroyed) return;
-
-        var url = mi.resolvedUrl;
-        var script = scriptMap[url] || defaultScriptDataPrototype;
-
-        mi.scriptData = Object.create(script);
-        mi.scriptData.mapItem = mi;
+        //if(mi.destroyed || !mi.parent || mi.parent.destroyed) return;
+        //
+        //var url = mi.resolvedUrl;
+        //var script = scriptMap[url] || defaultScriptDataPrototype;
+        //
+        //mi.scriptData = Object.create(script);
+        //mi.scriptData.mapItem = mi;
 
         if(!mi.isAlloy) {
             mi._generateDomIds();
@@ -1551,7 +1566,7 @@
                         var resolvedURL = self._resolveUrl(def.url, def.path);
                         if(self.requirementsSeen[resolvedURL])
                             continue;
-                        newReq = createRequirement(resolvedURL, def.preload, urlReady, def.name, def.isRoute);
+                        newReq = createRequirement(resolvedURL, def.preload, urlReady, def.name, def.isRoute, def);
                         newReqs.push(newReq);
                         self.requirementsSeen[resolvedURL] = newReq;
                     }
@@ -1595,8 +1610,10 @@
                     addScriptElement(scriptText);
                 }
             } else if(endsWith(url,".html")) {
-                if(!req.preload)
-                    self.createAlloy(req);
+                if(!req.preload) {
+                    req.def.url = req.url || req.def.url; // todo need to redo all the filedownloads and mgmt
+                    self.createAlloy(req.def);
+                }
             }
         }
 
@@ -1616,17 +1633,18 @@
 
 
 
-    function createRequirement(requirementUrl, preload, fromUrl, name, isRoute){
+    function createRequirement(requirementUrl, preload, fromUrl, name, isRoute, def){
         var urlPlace = bus.location("n-url:"+requirementUrl);
-        return {url: requirementUrl, fromUrl: fromUrl, place: urlPlace, preload: preload, name: name, isRoute: isRoute};
+        return {url: requirementUrl, fromUrl: fromUrl, place: urlPlace, preload: preload, name: name, isRoute: isRoute, def:def};
     }
 
-    MapItem.prototype._cogAddRequirement = function(requirementUrl, preload, name, isRoute) {
+    // this only adds global js lib requirements currently
+    MapItem.prototype._cogAddRequirement = function(requirementUrl, preload, name, isRoute, def) {
 
         //console.log('add: '+ requirementUrl);
         var self = this;
         var urlPlace = bus.location("n-url:"+requirementUrl);
-        var requirement = {url: requirementUrl, fromUrl: self.resolvedUrl, place: urlPlace, preload: preload, name: name, isRoute: isRoute};
+        var requirement = {url: requirementUrl, fromUrl: self.resolvedUrl, place: urlPlace, preload: preload, name: name, isRoute: isRoute, def: def};
 
         self.requirements.push(requirement);
         self.requirementsSeen[requirement.url] = requirement;
@@ -1866,7 +1884,10 @@
 
 
     MapItem.prototype.createAlias = function(def){
-        return this.aliasMap[def.name] = this._resolveUrl(def.url, def.path);
+        var url = this.aliasMap[def.name] = this._resolveUrl(def.url, def.path);
+        if(def.prop)
+            this.exposeProp(def.name, url);
+        return url;
     };
 
     MapItem.prototype.createValve = function(def){

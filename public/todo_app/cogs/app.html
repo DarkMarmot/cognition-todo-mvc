@@ -2,7 +2,8 @@
 
     <preload url="footer.html, header.html, main.html, item.html, itemEdit.html, itemView.html" />
 
-    <alloy url="../alloys/storage.html" />
+
+    <alloy url="../alloys/storage.html" source="prop dog" item="data cow" />
     <alloy url="../alloys/routes.html" />
 
     <sensor watch="storage" adapt="hasItems" change="true" run="render" />
@@ -59,6 +60,7 @@
 <script>
     $.cog({
 
+        dog: {'fur': 5, tail: 3},
         hasItems: function(msg) { return msg.length > 0; },
 
         render: function (msg) {
