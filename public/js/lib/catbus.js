@@ -1,5 +1,5 @@
 /**
- * catbus.js (v2.0.7)
+ * catbus.js (v2.2.0)
  *
  * Copyright (c) 2015 Scott Southworth, Landon Barnickle & Contributors
  *
@@ -247,7 +247,7 @@
             var linkData = searchStr.substr(5);
             return {linkType: 'lzs', linkData: linkData};
         }
-         return null;
+        return null;
 
     };
 
@@ -668,6 +668,7 @@
         this._batchedAsList = [];
         this._keep = null; // last or first or all or null (not batching)
         this._pipe = false;
+        this._change = null;
         this._needs = []; // array of tags needed before firing
         this._retain = false; // will retain prior tag messages
         this._last = null;
@@ -716,7 +717,7 @@
         zone:  {name: 'zone', valid: '_isZone', setter: '_setZone', prop: '_zone'},
         defer: {name: 'defer', type: 'boolean' , prop: '_defer', default_set: true},
         batch: {name: 'batch', type: 'boolean' , prop: '_batch', default_set: true, setter: '_setBatch'},
-        change: {name: 'change', type: 'boolean' , prop: '_change', default_set: true},
+        change: {name: 'change', type: 'function', prop: '_change', default_set: function(msg){ return msg;}},
         optional: {name: 'optional', type: 'boolean' , prop: '_optional', default_set: true},
         group: {name: 'group', type: 'function', prop: '_group', functor: true, default_set: function(msg, topic, name){ return name;}},
         pipe: {name: 'pipe', valid: '_isLocation', prop: '_pipe'},
@@ -729,14 +730,14 @@
         on: {name: 'on', alias: ['topic','sense'], type: 'string' , setter: '_setTopic', getter: '_getTopic'},
         //watch:  {name: 'watch', alias: ['location','at'], transform: '_toLocation', valid: '_isLocation', setter: '_watch', getter: '_getLocation'},
         exit:  {name: 'exit', alias: ['transform'], type: 'function', functor: true, prop: '_transformMethod'},
-        enter: {name: 'enter', alias: ['adapt'], type: 'function', functor: true, prop:'_appear'},
+        enter: {name: 'enter', alias: ['conform','adapt'], type: 'function', functor: true, prop:'_appear'},
         extract: {name: 'extract',  transform: '_toString', type: 'string', prop:'_extract'},
         run: {name: 'run', type: 'function' , prop: '_callback'},
         filter: {name: 'filter', type: 'function' , prop: '_filter'},
         as: {name: 'as', type: 'object' , prop: '_context'},
         max:  {name: 'max', transform: '_toInt', type: 'number' , prop: '_max'},
         once:  {name: 'once', no_arg: true, prop: '_max', default_set: 1},
-        tag: {name: 'tag', getter: '_getTag', prop: '_tag', type: 'string'}
+        tag: {name: 'tag', getter: '_getTag', prop: '_tag', functor: true}
 
     };
 
@@ -1025,15 +1026,15 @@
 
     Sensor.prototype._setZone = function(newZone){
 
-            var oldZone = this._zone;
-            if(oldZone)
-                delete oldZone._sensors[this._id];
-            this._zone = newZone;
+        var oldZone = this._zone;
+        if(oldZone)
+            delete oldZone._sensors[this._id];
+        this._zone = newZone;
 
-            if(newZone)
-                newZone._sensors[this._id] = this;
+        if(newZone)
+            newZone._sensors[this._id] = this;
 
-            return this;
+        return this;
     };
 
     Sensor.prototype._setHost = function(name) {
@@ -1070,15 +1071,6 @@
 
     };
 
-
-
-    Sensor.prototype._setGroup = function(group){
-
-        this._group = group;
-        //if(group)
-        //    this.batch(true);
-        return this;
-    };
 
     Sensor.prototype._setBatch = function(batch){
 
@@ -1130,8 +1122,10 @@
     };
 
 
-    // if names -> resolve to multi loc, if locations array -> to multi loc, if location
-    Sensor.prototype.watch2 = function(namesOrLocations, where, optional) {
+
+    Sensor.prototype.merge = Sensor.prototype.next =function(mergeTopic) {
+
+        mergeTopic = mergeTopic || 'update';
 
         var sensors = this._multi || [this];
 
@@ -1146,29 +1140,8 @@
             mergeContext = mergeContext || s._context;
             s.pipe(mergeLoc);
         }
-
-        var mergedSensor = mergeLoc.sensor().host(mergeHost).as(mergeContext);
-        return mergedSensor;
-
-    };
-
-    Sensor.prototype.merge = Sensor.prototype.next =function() {
-
-        var sensors = this._multi || [this];
-
-        var mergeLoc = this._mergeLoc = this._zone._demandLocation(); // demandLocation('auto:' + (catbus.uid + 1));
-
-        var mergeHost = this._host && this._host._name;
-        var mergeContext = this._context;
-
-        for(var i = 0; i < sensors.length; i++){
-            var s = sensors[i];
-            mergeHost = mergeHost || (s._host && s._host._name);
-            mergeContext = mergeContext || s._context;
-            s.pipe(mergeLoc);
-        }
-
-        var mergedSensor = mergeLoc.sensor().host(mergeHost).as(mergeContext);
+        var mergedSensor = mergeLoc.on(mergeTopic).host(mergeHost).as(mergeContext);
+        //var mergedSensor = mergeLoc.sensor().host(mergeHost).as(mergeContext);
         return mergedSensor;
 
     };
@@ -1213,10 +1186,11 @@
 
         msg = (typeof this._appear === 'function') ? this._appear.call(this._context || this, msg, topic, tag) : msg;
 
-        if(this._change && this._lastAppearingMsg === msg)
+        var compare_msg = this._change && this._change.call(null, msg, topic, tag);
+        if(this._change && compare_msg === this._lastAppearingMsg)
             return this;
 
-        this._lastAppearingMsg = msg;
+        this._lastAppearingMsg = compare_msg;
 
         if(!this._callback && !this._pipe)
             return this; // no actions to take
@@ -1391,6 +1365,7 @@
         this._zone = null;
         this._service = null;
         this._routeKey = '';
+        this._methodMap = {};
         this._demandCluster('*'); // wildcard storage location for all topics
         this._demandCluster('update'); // default for data storage
         this._dropped = false;
@@ -1402,6 +1377,18 @@
         this._isRoute = true;
         this._determineRouteKey();
 
+    };
+
+    Location.prototype.method = function(requestTopic, responseTopic, method){
+        // todo: maintain hash by requestTopic for dropping and redefining methods
+        this._methodMap[requestTopic] = responseTopic;
+        this.on(requestTopic).transform(method).emit(responseTopic).pipe(this);
+    };
+
+    Location.prototype.invoke = function(requestTopic, requestData){
+        this.write(requestData, requestTopic);
+        var responseTopic = this._methodMap[requestTopic];
+        return this.read(responseTopic);
     };
 
     Location.prototype._determineRouteKey = function(){
@@ -1475,7 +1462,7 @@
         return this._name || null;
     };
 
-    Location.prototype.adapt = Location.prototype.transform = function(f){
+    Location.prototype.conform = Location.prototype.adapt = Location.prototype.transform = function(f){
         this._appear = createFunctor(f);
         return this;
     };

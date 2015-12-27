@@ -1,7 +1,7 @@
 ;(function($) {
 
     /**
-     * cognition.js (v1.0.16-adapting)
+     * cognition.js (v1.1.0-parsie)
      *
      * Copyright (c) 2015 Scott Southworth, Landon Barnickle, Nick Lorenson & Contributors
      *
@@ -189,6 +189,10 @@
         return sel.length > 0 && sel[0].hasAttribute(attrName);
     }
 
+    function extractHasAttr2(node, attrName){
+        return node && node.attributes.getNamedItem(attrName);
+    }
+
     function extractString(sel, attrNameOrNames, defaultValue){
 
         var attrValue = determineFirstDefinedAttrValue(sel, attrNameOrNames);
@@ -196,7 +200,15 @@
             return attrValue.trim();
         return defaultValue;
 
-        //return (typeof value === 'string') ? value.trim() : value;
+    }
+
+    function extractString2(node, attrNameOrNames, defaultValue){
+
+        var attrValue = determineFirstDefinedAttrValue2(node, attrNameOrNames);
+        if(attrValue)
+            return attrValue.trim();
+        return defaultValue;
+
     }
 
     function extractBool(sel, attrNameOrNames, defaultValue){
@@ -214,9 +226,34 @@
 
     }
 
+    function extractBool2(node, attrNameOrNames, defaultValue){
+
+        var attrValue = determineFirstDefinedAttrValue2(node, attrNameOrNames);
+
+        if(attrValue === undefined)
+            return defaultValue;
+        if(attrValue === 'true')
+            return true;
+        if(attrValue === 'false')
+            return false;
+
+        throwParseError(node, 'bool', attrNameOrNames);
+
+    }
+
+
     function extractStringArray(sel, attrNameOrNames){
 
         var attrValue = determineFirstDefinedAttrValue(sel, attrNameOrNames);
+        if(attrValue)
+            return stringToStringArray(attrValue);
+        return [];
+
+    }
+
+    function extractStringArray2(node, attrNameOrNames){
+
+        var attrValue = determineFirstDefinedAttrValue2(node, attrNameOrNames);
         if(attrValue)
             return stringToStringArray(attrValue);
         return [];
@@ -240,7 +277,6 @@
 
     }
 
-
     function determineFirstDefinedAttrValue(sel, attrNameOrNames){
 
         var arr = stringToStringArray(attrNameOrNames);
@@ -248,6 +284,18 @@
             var attrValue = sel.attr(arr[i]);
             if(attrValue !== undefined)
                 return attrValue;
+        }
+        return undefined;
+    }
+
+    function determineFirstDefinedAttrValue2(node, attrNameOrNames){
+
+        var arr = stringToStringArray(attrNameOrNames);
+        var atts = node.attributes;
+        for(var i = 0; i < arr.length; i++){
+            var att = atts.getNamedItem(arr[i]);
+                if(att)
+                    return att.value;
         }
         return undefined;
     }
@@ -310,12 +358,65 @@
     }
 
 
-    function extractSensorDef(sel){
+    function extractCommandDef2(node){
 
         var d = {
 
-            // add by('tag') default -- or topic, or name, or index
-            // add index('field') -- for by() method -- or group(function(msg, topic, tag) return string?
+            name: extractString2(node, 'name'),
+            pipe: extractString2(node, 'pipe'),
+            toggle: extractString2(node, 'toggle'),
+            filter: extractString2(node, 'filter'),
+            topic: extractString2(node, 'on', 'update'),
+            run: extractString2(node, 'run'),
+            emit: extractString2(node, 'emit'),
+            emitPresent: extractHasAttr2(node, 'emit'),
+            emitType: null,
+            once: extractBool2(node, 'once'),
+            change: extractBool2(node, 'change', false),
+            extract: extractString2(node, 'extract'),
+            transform: extractString2(node, 'transform'),
+            transformPresent: extractHasAttr2(node, 'transform'),
+            transformType: null,
+            adapt: extractString2(node, 'adapt'),
+            adaptPresent: extractHasAttr2(node, 'adapt'),
+            adaptType: null,
+            autorun: false,
+            batch: extractBool2(node, 'batch'),
+            keep: 'last', // first, all, or last
+            need: extractStringArray2(node, 'need'),
+            gather: extractStringArray2(node, 'gather'),
+            defer: extractBool2(node, 'defer')
+
+        };
+
+        d.watch = [d.name];
+
+        // gather needs and cmd -- only trigger on cmd
+        if(d.gather.length || d.need.length) {
+            d.gather.push(d.name);
+
+            for (var i = 0; i < d.need.length; i++) {
+                var need = d.need[i];
+                if (d.gather.indexOf(need) === -1)
+                    d.gather.push(need);
+            }
+        }
+
+        d.batch = d.batch || d.run;
+        d.group = d.batch; // todo make new things to avoid grouping and batching with positive statements
+        d.retain = d.group;
+
+        applyFieldType(d, 'transform', PROP);
+        applyFieldType(d, 'emit', STRING);
+        applyFieldType(d, 'adapt', PROP);
+
+        return d;
+
+    }
+
+    function extractSensorDef(sel){
+
+        var d = {
 
             name: extractString(sel, 'data'),
             cmd: extractString(sel, 'cmd'),
@@ -324,7 +425,8 @@
             data: extractString(sel, 'data'),
             find: extractString(sel, 'id,find,node'), // todo switch all to id
             optional: extractBool(sel, 'optional'),
-            where: extractString(sel, 'where', 'first'),
+            where: extractString(sel, 'from,where', 'first'),
+            pipeWhere: extractString(sel, 'to', 'first'),
             thing: extractString(sel, 'is', 'data'), // data, feed, service
             pipe: extractString(sel, 'pipe'),
             toggle: extractString(sel, 'toggle'),
@@ -336,7 +438,10 @@
             emitPresent: extractHasAttr(sel, 'emit'),
             emitType: null,
             once: extractBool(sel, 'once'),
-            retain: extractBool(sel, 'retain'),
+            retain: extractBool(sel, 'retain'), // opposite of forget, now the default
+            forget: extractBool(sel, 'forget'), // doesn't retain group hash values from prior flush events
+            fresh: extractBool(sel, 'fresh'), // send only fresh, new values (does not autorun with preexisting data)
+            separate: extractBool(sel, 'separate'), // turns off automatic batching and grouping
             group: extractBool(sel, 'group'),
             change: extractBool(sel, 'change,distinct,skipDupes', false),
             extract: extractString(sel, 'extract'),
@@ -377,10 +482,94 @@
             }
         }
 
-        if(!d.find && !d.cmd) // && d.watch.length > 0)
+        if(!d.find && !d.cmd && !d.fresh) // && d.watch.length > 0)
             d.autorun = true;
 
-        d.batch = d.batch || (d.watch.length > 1); // todo -- allow multiples without batching?
+        d.batch = !d.separate && (d.batch || (d.watch.length > 1));
+        d.group = d.batch; // todo make new things to avoid grouping and batching with positive statements
+        d.retain = d.group;
+
+
+        applyFieldType(d, 'transform', PROP);
+        applyFieldType(d, 'emit', STRING);
+        applyFieldType(d, 'adapt', PROP);
+
+        return d;
+
+    }
+
+    function extractSensorDef2(node){
+
+        var d = {
+
+            name: extractString2(node, 'data'),
+            cmd: extractString2(node, 'cmd'),
+            watch: extractStringArray2(node, 'watch'),
+            detect: extractString2(node, 'detect'),
+            data: extractString2(node, 'data'),
+            find: extractString2(node, 'id,find,node'), // todo switch all to id
+            optional: extractBool2(node, 'optional'),
+            where: extractString2(node, 'from,where', 'first'),
+            pipeWhere: extractString2(node, 'to', 'first'),
+            thing: extractString2(node, 'is', 'data'), // data, feed, service
+            pipe: extractString2(node, 'pipe'),
+            toggle: extractString2(node, 'toggle'),
+            demand: extractString2(node, 'demand'),
+            filter: extractString2(node, 'filter'),
+            topic: extractString2(node, 'for,on,topic', 'update'),
+            run: extractString2(node, 'run'),
+            emit: extractString2(node, 'emit'),
+            emitPresent: extractHasAttr2(node, 'emit'),
+            emitType: null,
+            once: extractBool2(node, 'once'),
+            retain: extractBool2(node, 'retain'), // opposite of forget, now the default
+            forget: extractBool2(node, 'forget'), // doesn't retain group hash values from prior flush events
+            fresh: extractBool2(node, 'fresh'), // send only fresh, new values (does not autorun with preexisting data)
+            separate: extractBool2(node, 'separate'), // turns off automatic batching and grouping
+            group: extractBool2(node, 'group'),
+            change: extractBool2(node, 'change,distinct,skipDupes', false),
+            extract: extractString2(node, 'extract'),
+            transform: extractString2(node, 'transform'),
+            transformPresent: extractHasAttr2(node, 'transform'),
+            transformType: null,
+            adapt: extractString2(node, 'adapt'),
+            adaptPresent: extractHasAttr2(node, 'adapt'),
+            adaptType: null,
+            autorun: extractBool2(node, 'now,auto,autorun'),
+            batch: extractBool2(node, 'batch'),
+            keep: extractString2(node, 'keep', 'last'), // first, all, or last
+            need: extractStringArray2(node, 'need,needs'),
+            gather: extractStringArray2(node, 'gather'),
+            defer: extractBool2(node, 'defer')
+
+        };
+
+        var i;
+
+        // add needs to the watch
+        for(i = 0; i < d.need.length; i++){
+            var need = d.need[i];
+            if(d.watch.indexOf(need) === -1)
+                d.watch.push(need);
+        }
+
+        // add cmd to the watch list
+        if(d.cmd && d.watch.indexOf(d.cmd) === -1)
+            d.watch.push(d.cmd);
+
+        // add watches to the gathering -- if gathering
+        if(d.gather.length > 0) {
+            for (i = 0; i < d.watch.length; i++) {
+                var watch = d.watch[i];
+                if (d.gather.indexOf(watch) === -1)
+                    d.gather.push(watch);
+            }
+        }
+
+        if(!d.find && !d.cmd && !d.fresh) // && d.watch.length > 0)
+            d.autorun = true;
+
+        d.batch = !d.separate && (d.batch || (d.watch.length > 1));
         d.group = d.batch; // todo make new things to avoid grouping and batching with positive statements
         d.retain = d.group;
 
@@ -391,7 +580,6 @@
         return d;
 
     }
-
 
     function extractPropDef(sel){
 
@@ -408,12 +596,36 @@
 
     }
 
+    function extractPropDef2(node){
+
+        var d = {
+            find: extractString2(node, 'find'),
+            thing: extractString2(node, 'is', 'data'),
+            where: extractString2(node, 'where', 'first'),
+            optional: extractBool2(node, 'optional'),
+            name: extractString2(node, 'name')
+        };
+
+        d.name = d.name || d.find;
+        return d;
+
+    }
+
     function extractWriteDef(sel){
         return {
             name: extractString(sel, 'name'),
             thing: extractString(sel, 'is', 'data'),
             where: extractString(sel, 'where', 'first'),
             value: extractString(sel, 'value')
+        };
+    }
+
+    function extractWriteDef2(node){
+        return {
+            name: extractString2(node, 'name'),
+            thing: extractString2(node, 'is', 'data'),
+            where: extractString2(node, 'where', 'first'),
+            value: extractString2(node, 'value')
         };
     }
 
@@ -438,6 +650,27 @@
         return d;
     }
 
+    function extractAdapterDef2(node){
+
+        var d =  {
+            name: extractString2(node, 'name'),
+            control: extractBool2(node, 'control'),
+            optional: extractBool2(node, 'optional'),
+            field: extractString2(node, 'field'),
+            fieldType: null,
+            item: extractString2(node, 'item')
+            // todo -- add dynamic adapter that rewires?
+        };
+
+        d.name = d.name || d.field;
+        d.field = d.field || d.name;
+
+        applyFieldType(d, 'field', STRING);
+
+
+        return d;
+    }
+
 
     function extractValveDef(sel){
         return {
@@ -446,11 +679,31 @@
         };
     }
 
+    function extractValveDef2(node){
+        return {
+            allow: extractStringArray2(node, 'allow'),
+            thing: extractString2(sel, 'is', 'data')
+        };
+    }
+
     function extractLibraryDef(sel){
         return {
             name: null,
             url: extractStringArray(sel, 'url'),
             path: extractString(sel, 'path'),
+            isRoute: false,
+            isAlloy: false,
+            isLibrary: true,
+            isPreload: false,
+            preload: false
+        };
+    }
+
+    function extractLibraryDef2(node){
+        return {
+            name: null,
+            url: extractStringArray2(node, 'url'),
+            path: extractString2(node, 'path'),
             isRoute: false,
             isAlloy: false,
             isLibrary: true,
@@ -472,6 +725,19 @@
         };
     }
 
+    function extractPreloadDef2(node){
+        return {
+            name: null,
+            url: extractStringArray2(node, 'url'),
+            path: extractString2(node, 'path'),
+            isRoute: false,
+            isAlloy: false,
+            isLibrary: false,
+            isPreload: true,
+            preload: true
+        };
+    }
+
     function extractAlloyDef(sel){
 
         var d = {
@@ -481,6 +747,27 @@
             isRoute: extractBool(sel, 'route'),
             source: extractString(sel, 'source'),
             item: extractString(sel, 'item','itemData'),
+            isAlloy: true,
+            isLibrary: false,
+            isPreload: false,
+            preload: false
+        };
+
+        applyFieldType(d,'source', DATA);
+        applyFieldType(d,'item', DATA);
+
+        return d;
+    }
+
+    function extractAlloyDef2(node){
+
+        var d = {
+            url: extractString2(node, 'url'),
+            path: extractString2(node, 'path'),
+            name: extractString2(node, 'name'),
+            isRoute: extractBool2(node, 'route'),
+            source: extractString2(node, 'source'),
+            item: extractString2(node, 'item','itemData'),
             isAlloy: true,
             isLibrary: false,
             isPreload: false,
@@ -516,6 +803,27 @@
 
     }
 
+    function extractServiceDef2(node){
+
+        var d = {
+            name: extractString2(node, 'name'),
+            to: extractString2(node, 'to'),
+            url: extractString2(node, 'url'),
+            path: extractString2(node, 'path'),
+            topic: extractString2(node, 'on,topic'),
+            run: extractString2(node, 'run'),
+            post: extractBool2(node, 'post'),
+            format: extractString2(node, 'format', 'jsonp'),
+            request: extractBool2(node, 'req,request'),
+            prop: extractBool2(node, 'prop')
+        };
+
+
+        return d;
+
+    }
+
+
     function extractDefaultFeedDefFromServiceDef(def){
         return {
             name: def.name,
@@ -547,6 +855,28 @@
 
     }
 
+    function extractCogDef2(node){
+
+        var d = {
+
+            path: extractString2(node, "path"),
+            name: extractString2(node, "name"),
+            isRoute: extractBool2(node, "route"),
+            url: extractString2(node, "url"),
+            source: extractString2(node, 'use') || extractString2(node, 'from,source'),
+            item: extractString2(node, 'make') || extractString2(node, 'to,item','cog'),
+            target: extractString2(node, "id,find"),
+            action: extractString2(node, "and", 'append')
+
+        };
+
+        applyFieldType(d,'url');
+        applyFieldType(d,'source', DATA);
+        applyFieldType(d,'item', DATA);
+
+        return d;
+
+    }
 
     function extractChainDef(sel){
 
@@ -573,6 +903,32 @@
 
     }
 
+    function extractChainDef2(node){
+
+        var d = {
+            path: extractString2(node, "path"),
+            name: extractString2(node, "name"),
+            isRoute: extractBool2(node, "route"),
+            url: extractString2(node, "url"),
+            prop: extractBool2(node, 'prop'),
+            source: extractString2(node, "from,source"),
+            item: extractString2(node, "to,value,item",'cog'),
+            key: extractString2(node, "key"),
+            build: extractString2(node, 'build', 'append'), // scratch, append, sort
+            order: extractBool2(node, 'order'), // will use flex order css
+            depth: extractBool2(node, 'depth'), // will use z-index
+            target: extractString2(node, "node,id,find")
+
+        };
+
+        applyFieldType(d, 'source', DATA);
+        applyFieldType(d, 'item', DATA);
+
+        return d;
+
+    }
+
+
     function extractFeedDef(sel){
 
         var d = {
@@ -581,6 +937,22 @@
             request: extractBool(sel, 'req,request'),// todo change to extractBool and test
             name: extractString(sel, 'name', false),
             prop: extractBool(sel, 'prop', false)
+        };
+
+        d.name = d.name || d.service;
+
+        return d;
+
+    }
+
+    function extractFeedDef2(node){
+
+        var d = {
+            service: extractString2(node, 'service'),
+            to: extractString2(node, 'to,data'), // todo decide on to or data
+            request: extractBool2(node, 'req,request'),// todo change to extractBool and test
+            name: extractString2(node, 'name', false),
+            prop: extractBool2(node, 'prop', false)
         };
 
         d.name = d.name || d.service;
@@ -612,6 +984,109 @@
             verb: extractString(sel, 'verb'),
             prop: extractBool(sel, 'prop'),
             request: extractBool(sel, 'req,request', false) // todo support data loc sensored, if object then acts as params in request
+        };
+
+        applyFieldType(d, 'value');
+        applyFieldType(d, 'params', PROP);
+        applyFieldType(d, 'service');
+        applyFieldType(d, 'adapt', PROP);
+
+        return d;
+
+    }
+
+    function extractDataDef2(node){
+
+        var d = {
+            name: extractString2(node, 'name'),
+            inherit: extractBool2(node, 'inherit'),
+            isRoute: extractBool2(node, 'route'),
+            value: extractString2(node, 'value'),
+            valuePresent: extractHasAttr2(node, 'value'),
+            valueType: null,
+            adapt: extractString2(node, 'adapt'),
+            adaptType: null,
+            adaptPresent: extractHasAttr2(node, 'adapt'),
+            service: extractString2(node, 'service'),
+            serviceType: null,
+            servicePresent: extractHasAttr2(node, 'service'),
+            params: extractString2(node, 'params'),
+            paramsType: null,
+            paramsPresent: extractHasAttr2(node, 'params'),
+            url: extractString2(node, 'url'),
+            path: extractString2(node, 'path'),
+            verb: extractString2(node, 'verb'),
+            prop: extractBool2(node, 'prop'),
+            request: extractBool2(node, 'req,request', false) // todo support data loc sensored, if object then acts as params in request
+        };
+
+        applyFieldType(d, 'value');
+        applyFieldType(d, 'params', PROP);
+        applyFieldType(d, 'service');
+        applyFieldType(d, 'adapt', PROP);
+
+        return d;
+
+    }
+
+    function extractNetDef(sel){
+
+        var d = {
+            name: extractString(sel, 'name'),
+            inherit: extractBool(sel, 'inherit'),
+            isRoute: extractBool(sel, 'route'),
+            value: extractString(sel, 'value'),
+            valuePresent: extractHasAttr(sel, 'value'),
+            valueType: null,
+            adapt: extractString(sel, 'adapt'),
+            adaptType: null,
+            adaptPresent: extractHasAttr(sel, 'adapt'),
+            service: extractString(sel, 'service'),
+            serviceType: null,
+            servicePresent: extractHasAttr(sel, 'service'),
+            params: extractString(sel, 'params'),
+            paramsType: null,
+            paramsPresent: extractHasAttr(sel, 'params'),
+            url: extractString(sel, 'url'),
+            path: extractString(sel, 'path'),
+            verb: extractString(sel, 'verb'),
+            prop: extractBool(sel, 'prop'),
+            request: extractBool(sel, 'req,request', false) // todo support data loc sensored, if object then acts as params in request
+        };
+
+        applyFieldType(d, 'value');
+        applyFieldType(d, 'params', PROP);
+        applyFieldType(d, 'service');
+        applyFieldType(d, 'adapt', PROP);
+
+        return d;
+
+    }
+
+
+    function extractNetDef2(node){
+
+        var d = {
+            name: extractString2(node, 'name'),
+            inherit: extractBool2(node, 'inherit'),
+            isRoute: extractBool2(node, 'route'),
+            value: extractString2(node, 'value'),
+            valuePresent: extractHasAttr2(node, 'value'),
+            valueType: null,
+            adapt: extractString2(node, 'adapt'),
+            adaptType: null,
+            adaptPresent: extractHasAttr2(node, 'adapt'),
+            service: extractString2(node, 'service'),
+            serviceType: null,
+            servicePresent: extractHasAttr2(node, 'service'),
+            params: extractString2(node, 'params'),
+            paramsType: null,
+            paramsPresent: extractHasAttr2(node, 'params'),
+            url: extractString2(node, 'url'),
+            path: extractString2(node, 'path'),
+            verb: extractString2(node, 'verb'),
+            prop: extractBool2(node, 'prop'),
+            request: extractBool2(node, 'req,request', false) // todo support data loc sensored, if object then acts as params in request
         };
 
         applyFieldType(d, 'value');
@@ -688,6 +1163,17 @@
 
     }
 
+    function extractAliasDef2(node){
+
+        return {
+            name: extractString2(node, 'name'),
+            path: extractString2(node, 'path'),
+            url: extractString2(node, 'url'),
+            prop: extractBool2(node, 'prop')
+        };
+
+    }
+
     function extractMethodDef(sel){
 
         var d = {
@@ -702,143 +1188,98 @@
         return d;
     }
 
+    function extractMethodDef2(node){
+
+        var d = {
+            name: extractString2(node, 'name'),
+            func: extractString2(node, 'func'),
+            bound: extractBool2(node, 'bound')
+        };
+
+        d.name = d.name || d.func;
+        d.func = d.func || d.name;
+
+        return d;
+    }
+
     function extractDeclarations(sel){
 
         var decs = {};
-        var arr, urls;
 
-        arr = decs.aliases = [];
-        var aliases = sel.find("alias");
-        aliases.each(function(){
-            var aliasDef = extractAliasDef($(this));
-            arr.push(aliasDef);
-        });
+        function getDefs(source, extractor, multiName){
 
-        arr = decs.adapters = [];
-        var adapters = sel.find("adapter");
-        adapters.each(function(){
-            var adapterDef = extractAdapterDef($(this));
-            arr.push(adapterDef);
-        });
+            var result = [];
 
-        arr = decs.valves = [];
-        var valves = sel.find("valve");
-        valves.each(function(){
-            var valveDef = extractValveDef($(this));
-            arr.push(valveDef);
-        });
+            if(!source)
+                return result;
 
-        arr = decs.dataSources = [];
-        var dataSources = sel.find("data");
-        dataSources.each(function(){
-            var dataDef = extractDataDef($(this));
-            arr.push(dataDef);
-        });
+            for(var i = 0; i < source.length; i++){
+                var node = source[i];
+                var def = extractor($(node));
+                if(multiName) {
+                    for(var j = 0; j < def.url.length; j++){
+                        var def2 = copyProps(def, {});
+                        def2.url = def.url[j];
+                        result.push(def2);
+                    }
+                } else {
+                    result.push(def);
+                }
+            }
 
-        arr = decs.services = [];
-        var services = sel.find("service");
-        services.each(function(){
-            var serviceDef = extractServiceDef($(this));
-            arr.push(serviceDef);
-        });
+            return result;
+        }
 
-        arr = decs.feeds = [];
-        var feeds = sel.find("feed");
-        feeds.each(function(){
-            var feedDef = extractFeedDef($(this));
-            arr.push(feedDef);
-        });
+        function getDefs2(source, extractor, multiName){
 
-        arr = decs.methods = [];
-        var methods = sel.find("method");
-        methods.each(function(){
-            var methodDef = extractMethodDef($(this));
-            arr.push(methodDef);
-        });
+            var result = [];
 
-        arr = decs.properties = [];
-        var properties = sel.find("prop");
-        properties.each(function(){
-            var propDef = extractPropDef($(this));
-            arr.push(propDef);
-        });
+            if(!source)
+                return result;
 
-        arr = decs.sensors = [];
-        var sensors = sel.find("sensor");
+            for(var i = 0; i < source.length; i++){
+                var node = source[i];
+                var def = extractor(node);
+                if(multiName) {
+                    for(var j = 0; j < def.url.length; j++){
+                        var def2 = copyProps(def, {});
+                        def2.url = def.url[j];
+                        result.push(def2);
+                    }
+                } else {
+                    result.push(def);
+                }
+            }
+
+            return result;
+        }
+
+        decs.aliases = [].concat(getDefs2(sel.alias, extractAliasDef2));
+        decs.adapters = [].concat(getDefs2(sel.adapter, extractAdapterDef2));
+        decs.valves = [].concat(getDefs2(sel.valve, extractValveDef2));
+        decs.dataSources = [].concat(getDefs2(sel.data, extractDataDef2));
+        decs.dataSources = decs.dataSources.concat(getDefs2(sel.net, extractNetDef2));
+        decs.services = [].concat(getDefs2(sel.service, extractServiceDef2));
+        decs.feeds = [].concat(getDefs2(sel.feed, extractFeedDef2));
+        decs.methods = [].concat(getDefs2(sel.method, extractMethodDef2));
+        decs.properties = [].concat(getDefs2(sel.prop, extractPropDef2));
+        decs.sensors = [].concat(getDefs2(sel.sensor, extractSensorDef2));
+        var commandDefs = getDefs2(sel.command, extractCommandDef2);
+        decs.sensors = decs.sensors.concat(commandDefs);
+
         decs.commands = [];
-        sensors.each(function(){
-            var sensorDef = extractSensorDef($(this));
-            arr.push(sensorDef);
-            if(sensorDef.cmd)
-                decs.commands.push(sensorDef.cmd);
-        });
+        for(var i = 0; i < commandDefs.length; i++){
+            var def = commandDefs[i];
+            decs.commands.push(def.name);
+        }
 
-        var commands = sel.find("command");
-        commands.each(function(){
-            var commandDef = extractCommandDef($(this));
-            arr.push(commandDef);
-            if(commandDef.name)
-                decs.commands.push(commandDef.name);
-        });
-
-
-        arr = decs.writes = [];
-        var writes = sel.find("write");
-        writes.each(function(){
-            var writeDef = extractWriteDef($(this));
-            arr.push(writeDef);
-        });
-
-        arr = decs.cogs = [];
-        var cogs = sel.find("cog");
-        cogs.each(function(){
-            var cogDef = extractCogDef($(this));
-            arr.push(cogDef);
-        });
-
-        arr = decs.chains = [];
-        var chains = sel.find("chain");
-        chains.each(function(){
-            var chainDef = extractChainDef($(this));
-            arr.push(chainDef);
-        });
-
-        // todo -- finish separating this code that uses 'require' tags as the basis for preload and hoist
-        // todo -- this should be better once all requirement queues are handled in the bus
-
-        arr = decs.requires = [];
-        var requires = sel.find("require");
-        requires.each(function(){
-            var requireDef = extractLibraryDef($(this));
-            urls = requireDef.url;
-            urls.forEach(function(url){
-                var tempDef = copyProps(requireDef, {});
-                tempDef.url = url;
-                arr.push(tempDef);
-            });
-        });
-
-        arr = decs.requires;
-        var hoists = sel.find("hoist,trait,wire,alloy");
-        hoists.each(function(){
-            var hoistDef = extractAlloyDef($(this));
-            arr.push(hoistDef);
-        });
-
-        arr = decs.requires;
-        var preloads = sel.find("preload");
-        preloads.each(function(){
-            var preloadDef = extractPreloadDef($(this));
-            urls = preloadDef.url;
-            urls.forEach(function(url){
-                var tempDef = copyProps(preloadDef, {});
-                tempDef.url = url;
-                arr.push(tempDef);
-            });
-        });
-
-
-        sel.remove();
+        decs.writes = [].concat(getDefs2(sel.write, extractWriteDef2));
+        decs.cogs = [].concat(getDefs2(sel.cog, extractCogDef2));
+        decs.chains = [].concat(getDefs2(sel.chain, extractChainDef2));
+        decs.requires = [].concat(getDefs2(sel.require, extractLibraryDef2, true));
+        decs.requires = decs.requires.concat(getDefs2(sel.hoist, extractAlloyDef2));
+        decs.requires = decs.requires.concat(getDefs2(sel.alloy, extractAlloyDef2));
+        decs.requires = decs.requires.concat(getDefs2(sel.preload, extractPreloadDef2, true));
 
         return decs;
     }
@@ -971,6 +1412,8 @@
     };
 
     function copyProps(source, target){
+        source = source || {};
+        target = target || {};
         if(source){
             for(var k in source){
                 target[k] = source[k];
@@ -991,8 +1434,6 @@
         {name: 'services', method: 'createService'},
         {name: 'feeds', method: 'createFeed'},
         {name: 'methods', method: 'createMethod'}
-
-
 
     ];
 
@@ -1117,7 +1558,7 @@
         var self = this;
         var mi = new MapItem();
 
-        mi.cogZone = def.isRoute ? self.cogZone.demandChild(def.name, def.isRoute) : self.cogZone.demandChild();
+        mi.cogZone = def.isRoute ? self.cogZone.demandChild(def.name, def.isRoute) : self.cogZone.demandChild(def.name);
         mi.aliasZone = self.aliasZone.demandChild();
 
         mi.target = def.target;
@@ -1728,21 +2169,71 @@
         return (entireStr.lastIndexOf(ending) === (entireStr.length - ending.length) && entireStr.length > ending.length);
     }
 
+    var rxhtmlTag = /<(?!area|br|col|embed|hr|img|input|link|meta|param)(([\w:]+)[^>]*)\/>/gi;
+
+    function buildFragment(str) {
+
+        var elem, tmp, i,
+            fragment = document.createDocumentFragment(),
+            nodes = [];
+
+            tmp = fragment.appendChild(document.createElement("div"));
+
+            tmp.innerHTML = str.replace(rxhtmlTag, "<$1></$2>") ;
+
+            for(i = 0; i < tmp.childNodes.length; i++) {
+                nodes.push(tmp.childNodes[i]);
+            }
+
+            tmp = fragment.firstChild;
+            tmp.textContent = "";
+            fragment.textContent = "";
+
+        i = 0;
+        while ((elem = nodes[i++])) {
+            fragment.appendChild(elem);
+        }
+
+        return fragment;
+    }
+
+    function childNodesByName(node){
+
+        var result = {};
+        if(!node)
+            return result;
+
+        var children = node.childNodes;
+        var i = 0;
+        var n;
+
+        while((n = children[i++])){
+            var tag = n.localName;
+            var arr = result[tag] = result[tag] || [];
+            arr.push(n);
+        }
+
+        return result;
+    }
+
+
     function parseResponseHTML(response, url) {
 
+
+        var frag = buildFragment(response);
+        //console.log(frag);
 
         activeProcessURL = url;
 
         var responseSel = $(response);
-        var blueSel = responseSel.filter("blueprint");
-        var scriptSel = responseSel.filter("script");
+
+        var blueSel = childNodesByName(frag.querySelector('blueprint'));//responseSel.filter("blueprint");
+        var scriptSel = frag.querySelector('script'); //responseSel.filter("script");
         var htmlSel = responseSel.filter("display").children().clone();
 
         htmlSel.prevObject = null; // note: avoids terrible jquery bug, holding scary DOM references
 
-        var scriptText;
-        if(scriptSel.length > 0)
-            scriptText = scriptSel[0].innerHTML;
+        var scriptText= scriptSel && scriptSel.innerHTML;
 
         if(scriptText) {
             scriptText = wrapScript(scriptText, url);
@@ -2014,7 +2505,7 @@
         }
 
         if(def.change)
-            sensor.change(def.change);
+            sensor.change();
 
         if (def.filter) {
             var filterMethod = context[def.filter];
@@ -2024,7 +2515,7 @@
         var multiSensor = null;
         if(def.watch.length > 1) {
 
-            multiSensor = sensor; // add source (multi to source) and grab() -- grab all data upstream in a merged
+            multiSensor = sensor;
             sensor = sensor.merge().on(def.topic).batch();
 
         } else if(def.batch) {
@@ -2040,7 +2531,7 @@
             sensor.emit(this._resolveValueFromType(def.emit, def.emitType))
         }
 
-        if(def.retain)
+        if(def.retain && !def.forget)
             sensor.retain();
 
         if(def.group && multiSensor) {
@@ -2062,11 +2553,11 @@
             sensor.gather(def.gather);
 
         if(def.pipe) {
-            pipePlace = mi.cogZone.findData(def.pipe, 'first', def.optional); // mi._find(def.pipe, 'dataMap', def.pipeWhere);
+            pipePlace = mi.cogZone.findData(def.pipe, def.pipeWhere, def.optional);
             if(pipePlace)
                 sensor.pipe(pipePlace);
         } else if(def.toggle){
-            var togglePlace = mi.cogZone.findData(def.toggle, 'first', def.optional);
+            var togglePlace = mi.cogZone.findData(def.toggle, def.pipeWhere, def.optional);
             if(togglePlace)
                 sensor.run(function(){ togglePlace.toggle();});
         }
@@ -2545,8 +3036,32 @@
 
     WebService.prototype.init = function(settings, cog, location){
 
+        function overrideSettings(settings, overrides){
+            var result = {};
+            copyProps(settings, result);
+            copyProps(overrides, result);
+            return result;
+        }
 
         this._location = location;
+
+        location.on('settings,inline_settings').host(cog.uid).batch().merge('*').batch().group(function(msg,topic){return topic;}).retain().
+            transform(function(msg){return overrideSettings(msg.settings, msg.inline_settings)}).emit('mixed_settings').pipe(location);
+
+        location.on('mixed_settings').host(cog.uid).batch()
+            .filter(function(msg){return msg && msg.request;}).transform(function(){ return {}}).emit('request').pipe(location);
+
+        location.on('request').host(cog.uid).transform(
+
+            function(msg){
+                var request_settings = (typeof msg === 'object') ? msg : {};
+                var mixed_settings = location.read('mixed_settings');
+                var final_settings = overrideSettings(mixed_settings, request_settings);
+                return final_settings;
+            }).emit('do_request').pipe(location);
+
+        location.on('request').batch().run(function(msg){console.log('REQUEST SETTINGS:', msg);});
+
         this._cog = cog;
         this.settings(settings);
         this._location.service(this);
@@ -2592,7 +3107,7 @@
 
     WebService.prototype.isActive = function(){
 
-        return self._xhr && self._xhr.readyState && self._xhr.readyState != 4;
+        return this._xhr && this._xhr.readyState && this._xhr.readyState != 4;
 
     };
 
