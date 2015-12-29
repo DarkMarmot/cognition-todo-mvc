@@ -185,22 +185,11 @@
     }
 
 
-    function extractHasAttr(sel, attrName){
-        return sel.length > 0 && sel[0].hasAttribute(attrName);
-    }
 
     function extractHasAttr2(node, attrName){
         return node && node.attributes.getNamedItem(attrName);
     }
 
-    function extractString(sel, attrNameOrNames, defaultValue){
-
-        var attrValue = determineFirstDefinedAttrValue(sel, attrNameOrNames);
-        if(attrValue)
-            return attrValue.trim();
-        return defaultValue;
-
-    }
 
     function extractString2(node, attrNameOrNames, defaultValue){
 
@@ -211,20 +200,6 @@
 
     }
 
-    function extractBool(sel, attrNameOrNames, defaultValue){
-
-        var attrValue = determineFirstDefinedAttrValue(sel, attrNameOrNames);
-
-        if(attrValue === undefined)
-            return defaultValue;
-        if(attrValue === 'true')
-            return true;
-        if(attrValue === 'false')
-            return false;
-
-        throwParseError(sel, 'bool', attrNameOrNames);
-
-    }
 
     function extractBool2(node, attrNameOrNames, defaultValue){
 
@@ -242,14 +217,6 @@
     }
 
 
-    function extractStringArray(sel, attrNameOrNames){
-
-        var attrValue = determineFirstDefinedAttrValue(sel, attrNameOrNames);
-        if(attrValue)
-            return stringToStringArray(attrValue);
-        return [];
-
-    }
 
     function extractStringArray2(node, attrNameOrNames){
 
@@ -277,16 +244,6 @@
 
     }
 
-    function determineFirstDefinedAttrValue(sel, attrNameOrNames){
-
-        var arr = stringToStringArray(attrNameOrNames);
-        for(var i = 0; i < arr.length; i++){
-            var attrValue = sel.attr(arr[i]);
-            if(attrValue !== undefined)
-                return attrValue;
-        }
-        return undefined;
-    }
 
     function determineFirstDefinedAttrValue2(node, attrNameOrNames){
 
@@ -300,62 +257,6 @@
         return undefined;
     }
 
-
-    function extractCommandDef(sel){
-
-        var d = {
-
-            name: extractString(sel, 'name'),
-            pipe: extractString(sel, 'pipe'),
-            toggle: extractString(sel, 'toggle'),
-            filter: extractString(sel, 'filter'),
-            topic: extractString(sel, 'on', 'update'),
-            run: extractString(sel, 'run'),
-            emit: extractString(sel, 'emit'),
-            emitPresent: extractHasAttr(sel, 'emit'),
-            emitType: null,
-            once: extractBool(sel, 'once'),
-            change: extractBool(sel, 'change', false),
-            extract: extractString(sel, 'extract'),
-            transform: extractString(sel, 'transform'),
-            transformPresent: extractHasAttr(sel, 'transform'),
-            transformType: null,
-            adapt: extractString(sel, 'adapt'),
-            adaptPresent: extractHasAttr(sel, 'adapt'),
-            adaptType: null,
-            autorun: false,
-            batch: extractBool(sel, 'batch'),
-            keep: 'last', // first, all, or last
-            need: extractStringArray(sel, 'need'),
-            gather: extractStringArray(sel, 'gather'),
-            defer: extractBool(sel, 'defer')
-
-        };
-
-        d.watch = [d.name];
-
-        // gather needs and cmd -- only trigger on cmd
-        if(d.gather.length || d.need.length) {
-            d.gather.push(d.name);
-
-            for (var i = 0; i < d.need.length; i++) {
-                var need = d.need[i];
-                if (d.gather.indexOf(need) === -1)
-                    d.gather.push(need);
-            }
-        }
-
-        d.batch = d.batch || d.run;
-        d.group = d.batch; // todo make new things to avoid grouping and batching with positive statements
-        d.retain = d.group;
-
-        applyFieldType(d, 'transform', PROP);
-        applyFieldType(d, 'emit', STRING);
-        applyFieldType(d, 'adapt', PROP);
-
-        return d;
-
-    }
 
 
     function extractCommandDef2(node){
@@ -414,89 +315,6 @@
 
     }
 
-    function extractSensorDef(sel){
-
-        var d = {
-
-            name: extractString(sel, 'data'),
-            cmd: extractString(sel, 'cmd'),
-            watch: extractStringArray(sel, 'watch'),
-            detect: extractString(sel, 'detect'),
-            data: extractString(sel, 'data'),
-            find: extractString(sel, 'id,find,node'), // todo switch all to id
-            optional: extractBool(sel, 'optional'),
-            where: extractString(sel, 'from,where', 'first'),
-            pipeWhere: extractString(sel, 'to', 'first'),
-            thing: extractString(sel, 'is', 'data'), // data, feed, service
-            pipe: extractString(sel, 'pipe'),
-            toggle: extractString(sel, 'toggle'),
-            demand: extractString(sel, 'demand'),
-            filter: extractString(sel, 'filter'),
-            topic: extractString(sel, 'for,on,topic', 'update'),
-            run: extractString(sel, 'run'),
-            emit: extractString(sel, 'emit'),
-            emitPresent: extractHasAttr(sel, 'emit'),
-            emitType: null,
-            once: extractBool(sel, 'once'),
-            retain: extractBool(sel, 'retain'), // opposite of forget, now the default
-            forget: extractBool(sel, 'forget'), // doesn't retain group hash values from prior flush events
-            fresh: extractBool(sel, 'fresh'), // send only fresh, new values (does not autorun with preexisting data)
-            separate: extractBool(sel, 'separate'), // turns off automatic batching and grouping
-            group: extractBool(sel, 'group'),
-            change: extractBool(sel, 'change,distinct,skipDupes', false),
-            extract: extractString(sel, 'extract'),
-            transform: extractString(sel, 'transform'),
-            transformPresent: extractHasAttr(sel, 'transform'),
-            transformType: null,
-            adapt: extractString(sel, 'adapt'),
-            adaptPresent: extractHasAttr(sel, 'adapt'),
-            adaptType: null,
-            autorun: extractBool(sel, 'now,auto,autorun'),
-            batch: extractBool(sel, 'batch'),
-            keep: extractString(sel, 'keep', 'last'), // first, all, or last
-            need: extractStringArray(sel, 'need,needs'),
-            gather: extractStringArray(sel, 'gather'),
-            defer: extractBool(sel, 'defer')
-
-        };
-
-        var i;
-
-        // add needs to the watch
-        for(i = 0; i < d.need.length; i++){
-            var need = d.need[i];
-            if(d.watch.indexOf(need) === -1)
-                d.watch.push(need);
-        }
-
-        // add cmd to the watch list
-        if(d.cmd && d.watch.indexOf(d.cmd) === -1)
-            d.watch.push(d.cmd);
-
-        // add watches to the gathering -- if gathering
-        if(d.gather.length > 0) {
-            for (i = 0; i < d.watch.length; i++) {
-                var watch = d.watch[i];
-                if (d.gather.indexOf(watch) === -1)
-                    d.gather.push(watch);
-            }
-        }
-
-        if(!d.find && !d.cmd && !d.fresh) // && d.watch.length > 0)
-            d.autorun = true;
-
-        d.batch = !d.separate && (d.batch || (d.watch.length > 1));
-        d.group = d.batch; // todo make new things to avoid grouping and batching with positive statements
-        d.retain = d.group;
-
-
-        applyFieldType(d, 'transform', PROP);
-        applyFieldType(d, 'emit', STRING);
-        applyFieldType(d, 'adapt', PROP);
-
-        return d;
-
-    }
 
     function extractSensorDef2(node){
 
@@ -581,20 +399,6 @@
 
     }
 
-    function extractPropDef(sel){
-
-        var d = {
-            find: extractString(sel, 'find'),
-            thing: extractString(sel, 'is', 'data'),
-            where: extractString(sel, 'where', 'first'),
-            optional: extractBool(sel, 'optional'),
-            name: extractString(sel, 'name')
-        };
-
-        d.name = d.name || d.find;
-        return d;
-
-    }
 
     function extractPropDef2(node){
 
@@ -611,14 +415,6 @@
 
     }
 
-    function extractWriteDef(sel){
-        return {
-            name: extractString(sel, 'name'),
-            thing: extractString(sel, 'is', 'data'),
-            where: extractString(sel, 'where', 'first'),
-            value: extractString(sel, 'value')
-        };
-    }
 
     function extractWriteDef2(node){
         return {
@@ -629,26 +425,6 @@
         };
     }
 
-    function extractAdapterDef(sel){
-
-        var d =  {
-            name: extractString(sel, 'name'),
-            control: extractBool(sel, 'control'),
-            optional: extractBool(sel, 'optional'),
-            field: extractString(sel, 'field'),
-            fieldType: null,
-            item: extractString(sel, 'item')
-            // todo -- add dynamic adapter that rewires?
-        };
-
-        d.name = d.name || d.field;
-        d.field = d.field || d.name;
-
-        applyFieldType(d, 'field', STRING);
-
-
-        return d;
-    }
 
     function extractAdapterDef2(node){
 
@@ -672,30 +448,10 @@
     }
 
 
-    function extractValveDef(sel){
-        return {
-            allow: extractStringArray(sel, 'allow'),
-            thing: extractString(sel, 'is', 'data')
-        };
-    }
-
     function extractValveDef2(node){
         return {
             allow: extractStringArray2(node, 'allow'),
             thing: extractString2(sel, 'is', 'data')
-        };
-    }
-
-    function extractLibraryDef(sel){
-        return {
-            name: null,
-            url: extractStringArray(sel, 'url'),
-            path: extractString(sel, 'path'),
-            isRoute: false,
-            isAlloy: false,
-            isLibrary: true,
-            isPreload: false,
-            preload: false
         };
     }
 
@@ -712,18 +468,6 @@
         };
     }
 
-    function extractPreloadDef(sel){
-        return {
-            name: null,
-            url: extractStringArray(sel, 'url'),
-            path: extractString(sel, 'path'),
-            isRoute: false,
-            isAlloy: false,
-            isLibrary: false,
-            isPreload: true,
-            preload: true
-        };
-    }
 
     function extractPreloadDef2(node){
         return {
@@ -738,26 +482,6 @@
         };
     }
 
-    function extractAlloyDef(sel){
-
-        var d = {
-            url: extractString(sel, 'url'),
-            path: extractString(sel, 'path'),
-            name: extractString(sel, 'name'),
-            isRoute: extractBool(sel, 'route'),
-            source: extractString(sel, 'source'),
-            item: extractString(sel, 'item','itemData'),
-            isAlloy: true,
-            isLibrary: false,
-            isPreload: false,
-            preload: false
-        };
-
-        applyFieldType(d,'source', DATA);
-        applyFieldType(d,'item', DATA);
-
-        return d;
-    }
 
     function extractAlloyDef2(node){
 
@@ -781,27 +505,6 @@
     }
 
 
-
-
-    function extractServiceDef(sel){
-
-        var d = {
-            name: extractString(sel, 'name'),
-            to: extractString(sel, 'to'),
-            url: extractString(sel, 'url'),
-            path: extractString(sel, 'path'),
-            topic: extractString(sel, 'on,topic'),
-            run: extractString(sel, 'run'),
-            post: extractBool(sel, 'post'),
-            format: extractString(sel, 'format', 'jsonp'),
-            request: extractBool(sel, 'req,request'),
-            prop: extractBool(sel, 'prop')
-        };
-
-
-        return d;
-
-    }
 
     function extractServiceDef2(node){
 
@@ -832,29 +535,6 @@
         };
     }
 
-    function extractCogDef(sel){
-
-        var d = {
-
-            path: extractString(sel, "path"),
-            name: extractString(sel, "name"),
-            isRoute: extractBool(sel, "route"),
-            url: extractString(sel, "url"),
-            source: extractString(sel, 'use') || extractString(sel, 'from,source'),
-            item: extractString(sel, 'make') || extractString(sel, 'to,item','cog'),
-            target: extractString(sel, "id,find"),
-            action: extractString(sel, "and", 'append')
-
-        };
-
-        applyFieldType(d,'url');
-        applyFieldType(d,'source', DATA);
-        applyFieldType(d,'item', DATA);
-
-        return d;
-
-    }
-
     function extractCogDef2(node){
 
         var d = {
@@ -873,31 +553,6 @@
         applyFieldType(d,'url');
         applyFieldType(d,'source', DATA);
         applyFieldType(d,'item', DATA);
-
-        return d;
-
-    }
-
-    function extractChainDef(sel){
-
-        var d = {
-            path: extractString(sel, "path"),
-            name: extractString(sel, "name"),
-            isRoute: extractBool(sel, "route"),
-            url: extractString(sel, "url"),
-            prop: extractBool(sel, 'prop'),
-            source: extractString(sel, "from,source"),
-            item: extractString(sel, "to,value,item",'cog'),
-            key: extractString(sel, "key"),
-            build: extractString(sel, 'build', 'append'), // scratch, append, sort
-            order: extractBool(sel, 'order'), // will use flex order css
-            depth: extractBool(sel, 'depth'), // will use z-index
-            target: extractString(sel, "node,id,find")
-
-        };
-
-        applyFieldType(d, 'source', DATA);
-        applyFieldType(d, 'item', DATA);
 
         return d;
 
@@ -929,21 +584,6 @@
     }
 
 
-    function extractFeedDef(sel){
-
-        var d = {
-            service: extractString(sel, 'service'),
-            to: extractString(sel, 'to,data'), // todo decide on to or data
-            request: extractBool(sel, 'req,request'),// todo change to extractBool and test
-            name: extractString(sel, 'name', false),
-            prop: extractBool(sel, 'prop', false)
-        };
-
-        d.name = d.name || d.service;
-
-        return d;
-
-    }
 
     function extractFeedDef2(node){
 
@@ -961,39 +601,6 @@
 
     }
 
-    function extractDataDef(sel){
-
-        var d = {
-            name: extractString(sel, 'name'),
-            inherit: extractBool(sel, 'inherit'),
-            isRoute: extractBool(sel, 'route'),
-            value: extractString(sel, 'value'),
-            valuePresent: extractHasAttr(sel, 'value'),
-            valueType: null,
-            adapt: extractString(sel, 'adapt'),
-            adaptType: null,
-            adaptPresent: extractHasAttr(sel, 'adapt'),
-            service: extractString(sel, 'service'),
-            serviceType: null,
-            servicePresent: extractHasAttr(sel, 'service'),
-            params: extractString(sel, 'params'),
-            paramsType: null,
-            paramsPresent: extractHasAttr(sel, 'params'),
-            url: extractString(sel, 'url'),
-            path: extractString(sel, 'path'),
-            verb: extractString(sel, 'verb'),
-            prop: extractBool(sel, 'prop'),
-            request: extractBool(sel, 'req,request', false) // todo support data loc sensored, if object then acts as params in request
-        };
-
-        applyFieldType(d, 'value');
-        applyFieldType(d, 'params', PROP);
-        applyFieldType(d, 'service');
-        applyFieldType(d, 'adapt', PROP);
-
-        return d;
-
-    }
 
     function extractDataDef2(node){
 
@@ -1018,40 +625,6 @@
             verb: extractString2(node, 'verb'),
             prop: extractBool2(node, 'prop'),
             request: extractBool2(node, 'req,request', false) // todo support data loc sensored, if object then acts as params in request
-        };
-
-        applyFieldType(d, 'value');
-        applyFieldType(d, 'params', PROP);
-        applyFieldType(d, 'service');
-        applyFieldType(d, 'adapt', PROP);
-
-        return d;
-
-    }
-
-    function extractNetDef(sel){
-
-        var d = {
-            name: extractString(sel, 'name'),
-            inherit: extractBool(sel, 'inherit'),
-            isRoute: extractBool(sel, 'route'),
-            value: extractString(sel, 'value'),
-            valuePresent: extractHasAttr(sel, 'value'),
-            valueType: null,
-            adapt: extractString(sel, 'adapt'),
-            adaptType: null,
-            adaptPresent: extractHasAttr(sel, 'adapt'),
-            service: extractString(sel, 'service'),
-            serviceType: null,
-            servicePresent: extractHasAttr(sel, 'service'),
-            params: extractString(sel, 'params'),
-            paramsType: null,
-            paramsPresent: extractHasAttr(sel, 'params'),
-            url: extractString(sel, 'url'),
-            path: extractString(sel, 'path'),
-            verb: extractString(sel, 'verb'),
-            prop: extractBool(sel, 'prop'),
-            request: extractBool(sel, 'req,request', false) // todo support data loc sensored, if object then acts as params in request
         };
 
         applyFieldType(d, 'value');
@@ -1152,16 +725,6 @@
 
     }
 
-    function extractAliasDef(sel){
-
-        return {
-            name: extractString(sel, 'name'),
-            path: extractString(sel, 'path'),
-            url: extractString(sel, 'url'),
-            prop: extractBool(sel, 'prop')
-        };
-
-    }
 
     function extractAliasDef2(node){
 
@@ -1174,19 +737,6 @@
 
     }
 
-    function extractMethodDef(sel){
-
-        var d = {
-            name: extractString(sel, 'name'),
-            func: extractString(sel, 'func'),
-            bound: extractBool(sel, 'bound')
-        };
-
-        d.name = d.name || d.func;
-        d.func = d.func || d.name;
-
-        return d;
-    }
 
     function extractMethodDef2(node){
 
@@ -1205,30 +755,6 @@
     function extractDeclarations(sel){
 
         var decs = {};
-
-        function getDefs(source, extractor, multiName){
-
-            var result = [];
-
-            if(!source)
-                return result;
-
-            for(var i = 0; i < source.length; i++){
-                var node = source[i];
-                var def = extractor($(node));
-                if(multiName) {
-                    for(var j = 0; j < def.url.length; j++){
-                        var def2 = copyProps(def, {});
-                        def2.url = def.url[j];
-                        result.push(def2);
-                    }
-                } else {
-                    result.push(def);
-                }
-            }
-
-            return result;
-        }
 
         function getDefs2(source, extractor, multiName){
 
@@ -1900,7 +1426,7 @@
         if(mi.isAlloy)
             mi._cogInitialize();
         else {
-            mi.localSel =  htmlSel.clone();
+            mi.localSel = $(clonedArrayOfNodeList(htmlSel));  //htmlSel.clone();
             mi._cogRequestRequirements();
         }
 
@@ -1990,8 +1516,7 @@
             if(!el.length)
                 el = sel.filter('#'+id);
 
-            if(!el.data("preserveId"))
-                el.attr("id",this.uid+"_"+id);
+
             // TODO this camel stuff looks dumb, please fix or remove it
             var camelId = id.replace(/-([a-z])/g, function (g) { return g[1].toUpperCase(); });
             scriptData[camelId] = el;
@@ -2217,6 +1742,39 @@
     }
 
 
+
+
+    function clonedArrayOfChildNodes(node){
+
+        if(!node) return [];
+        var children = node.cloneNode(true).childNodes;
+        var i, n, result;
+        n = (i = children.length) - 1 >> 0;
+        result = new Array(i);
+        while (i--) {
+            result[n--] = children[i];
+        }
+        return result;
+
+    }
+
+    function clonedArrayOfNodeList(list){
+
+        if(!list) return [];
+        var i, n, result;
+        n = (i = list.length) - 1 >> 0;
+        result = new Array(i);
+        while (i--) {
+            result[n--] = list[i].cloneNode(true);
+        }
+        return result;
+
+    }
+
+
+
+
+
     function parseResponseHTML(response, url) {
 
 
@@ -2229,7 +1787,7 @@
 
         var blueSel = childNodesByName(frag.querySelector('blueprint'));//responseSel.filter("blueprint");
         var scriptSel = frag.querySelector('script'); //responseSel.filter("script");
-        var htmlSel = responseSel.filter("display").children().clone();
+        var htmlSel = clonedArrayOfChildNodes(frag.querySelector('display'));// responseSel.filter("display").children().clone();
 
         htmlSel.prevObject = null; // note: avoids terrible jquery bug, holding scary DOM references
 
@@ -2250,7 +1808,7 @@
             throw new Error("Script Data Failure:" + url);
 
         if(htmlSel.length > 0)
-            cacheMap[url] = htmlSel.clone();
+            cacheMap[url] = htmlSel; //.clone();
         declarationMap[url] = extractDeclarations(blueSel);
 
         scriptMap[url] = activeScriptData;
@@ -2266,8 +1824,7 @@
     }
 
     function parseElementIds(sel, scriptData){
-        // TODO store these in the mapitem function def creator later
-        // when map items runs as function list not parse build
+        sel = $(sel);
         var idSels = sel.find("[id]").add(sel.filter('[id]'));
         var ids = idSels.map(function() { return this.id; }).get();
         scriptData._ids = ids;
