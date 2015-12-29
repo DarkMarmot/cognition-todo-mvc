@@ -1113,7 +1113,7 @@
             if(!placeholder) {
                 mi.placeholder = $('<div style="display: none;"></div>');
                 mi.targetSel = (mi.target) ? self.scriptData[mi.target] : self.localSel.last();
-                mi.targetSel[mi.action](mi.placeholder);
+                mi.targetSel.append(mi.placeholder);  //[mi.action](mi.placeholder);
             } else {
                 mi.placeholder = placeholder;
             }
@@ -1475,13 +1475,6 @@
     MapItem.prototype._cogInitialize = function(){
 
         var mi = this;
-        //if(mi.destroyed || !mi.parent || mi.parent.destroyed) return;
-        //
-        //var url = mi.resolvedUrl;
-        //var script = scriptMap[url] || defaultScriptDataPrototype;
-        //
-        //mi.scriptData = Object.create(script);
-        //mi.scriptData.mapItem = mi;
 
         if(!mi.isAlloy) {
             mi._generateDomIds();
@@ -1515,8 +1508,7 @@
             var el = sel.find("#"+id);
             if(!el.length)
                 el = sel.filter('#'+id);
-
-
+            el.attr("id",this.uid+"_"+id);
             // TODO this camel stuff looks dumb, please fix or remove it
             var camelId = id.replace(/-([a-z])/g, function (g) { return g[1].toUpperCase(); });
             scriptData[camelId] = el;
