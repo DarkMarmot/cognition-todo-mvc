@@ -1066,8 +1066,8 @@
         mi.scriptData.mapItem = mi;
         self.childMap[mi.uid] = mi;
 
-        mi.placeholder = $('<div style="display: none;"></div>');
-        self.targetSel.append(mi.placeholder);
+        mi.placeholder = $(getPlaceholderDiv()); // $('<div style="display: none;"></div>');
+        self.targetNode.append(mi.placeholder);
 
         if(self.itemType === DATA) {
             mi.createData({name: name, value: data});
@@ -1111,9 +1111,9 @@
 
             mi.url = this._resolveValueFromType(mi.url, mi.urlType);
             if(!placeholder) {
-                mi.placeholder = $('<div style="display: none;"></div>');
-                mi.targetSel = (mi.target) ? self.scriptData[mi.target] : self.localSel.last();
-                mi.targetSel.append(mi.placeholder);  //[mi.action](mi.placeholder);
+                mi.placeholder = $(getPlaceholderDiv()); // $('<div style="display: none;"></div>');
+                mi.targetNode = (mi.target) ? self.scriptData[mi.target] : self.localSel.last();
+                mi.targetNode.append(mi.placeholder);  //[mi.action](mi.placeholder);
             } else {
                 mi.placeholder = placeholder;
             }
@@ -1123,7 +1123,7 @@
 
             mi.isPinion = true;
             mi._requirementsLoaded = true;
-            mi.targetSel = (mi.target) ? self.scriptData[mi.target] : self.localSel.last();
+            mi.targetNode = (mi.target) ? self.scriptData[mi.target] : self.localSel.last();
             mi.urlFromPlace = mi.cogZone.findData(mi.url).on('update').change().as(mi).host(mi.uid).run(mi._cogControlUrl).autorun();
 
         }
@@ -1158,7 +1158,7 @@
         self.childMap[mi.uid] = mi;
 
 
-        mi.targetSel = self.scriptData[mi.target];
+        mi.targetNode = self.scriptData[mi.target];
 
         var resolvedUrl = this._resolveUrl(def.url, def.path);
         var urlPlace = bus.location("n-url:"+resolvedUrl);
@@ -1446,8 +1446,8 @@
             url: url
         };
 
-        var placeholder = $('<div style="display: none;"></div>');
-        mi.targetSel.append(placeholder);
+        var placeholder = $(getPlaceholderDiv()); // $('<div style="display: none;"></div>');
+        mi.targetNode.append(placeholder);
         mi.createCog(def, placeholder);
 
     };
@@ -1486,7 +1486,7 @@
 
         if(mi.placeholder){
             mi.placeholder.after(mi.localSel);
-            mi.placeholder.remove();
+            returnPlaceholderDiv(mi.placeholder); //mi.placeholder.remove();
             mi.placeholder = null;
         }
 
@@ -1684,6 +1684,29 @@
 
     function endsWith(entireStr, ending){
         return (entireStr.lastIndexOf(ending) === (entireStr.length - ending.length) && entireStr.length > ending.length);
+    }
+
+    var placeholderDiv = buildPlaceholderDiv();
+    var placeholderDivPool = [];
+
+    function getPlaceholderDiv(){
+        if(placeholderDivPool.length > 0)
+            return placeholderDivPool.pop();
+        return placeholderDiv.cloneNode(false);
+    }
+
+    function returnPlaceholderDiv(div){
+        if (div.parentNode) {
+            div.parentNode.removeChild(div);
+            placeholderDivPool.push(div);
+        }
+    }
+
+    function buildPlaceholderDiv(){
+        var fragment = document.createDocumentFragment();
+        var tmp = fragment.appendChild(document.createElement("div"));
+        tmp.innerHTML = '<div style="display: none;"></div>';
+        return tmp.firstChild;
     }
 
     var rxhtmlTag = /<(?!area|br|col|embed|hr|img|input|link|meta|param)(([\w:]+)[^>]*)\/>/gi;
