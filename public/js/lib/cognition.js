@@ -1,7 +1,7 @@
 ;(function($) {
 
     /**
-     * cognition.js (v1.1.0-parsie)
+     * cognition.js (v1.1.1-parsie)
      *
      * Copyright (c) 2015 Scott Southworth, Landon Barnickle, Nick Lorenson & Contributors
      *
@@ -187,7 +187,7 @@
 
 
     function extractHasAttr2(node, attrName){
-        return node && node.attributes.getNamedItem(attrName);
+        return !!(node && node.attributes.getNamedItem(attrName));
     }
 
 
@@ -251,8 +251,8 @@
         var atts = node.attributes;
         for(var i = 0; i < arr.length; i++){
             var att = atts.getNamedItem(arr[i]);
-                if(att)
-                    return att.value;
+            if(att)
+                return att.value;
         }
         return undefined;
     }
@@ -1414,8 +1414,7 @@
         if(mi.destroyed || !mi.parent || mi.parent.destroyed) return;
 
         var url = mi.resolvedUrl;
-        var htmlSel = cacheMap[url];
-
+        var display = mi.display = cacheMap[url] && (cacheMap[url]).cloneNode(true);
         mi._declarationDefs = declarationMap[url];
 
         var script = scriptMap[url] || defaultScriptDataPrototype;
@@ -1423,10 +1422,22 @@
         mi.scriptData = Object.create(script);
         mi.scriptData.mapItem = mi;
 
+        var scriptData = mi.scriptData;
+
+
+
         if(mi.isAlloy)
             mi._cogInitialize();
         else {
-            mi.localSel = $(clonedArrayOfNodeList(htmlSel));  //htmlSel.clone();
+
+            var nodes = display.querySelectorAll('[id]');
+            for(var i = 0; i < nodes.length; i++){
+                var node = nodes[i];
+                scriptData[node.id] = $(node);
+                node.setAttribute('id', mi.uid + '_' + node.id);
+            }
+
+            mi.localSel = $(mi.display.childNodes); //$(clonedArrayOfNodeList(htmlSel));  //htmlSel.clone();
             mi._cogRequestRequirements();
         }
 
@@ -1477,7 +1488,7 @@
         var mi = this;
 
         if(!mi.isAlloy) {
-            mi._generateDomIds();
+            // mi._generateDomIds();
             mi._determineAlloys();
             mi._exposeAlloys();
         }
@@ -1486,7 +1497,7 @@
 
         if(mi.placeholder){
             mi.placeholder.after(mi.localSel);
-            returnPlaceholderDiv(mi.placeholder); //mi.placeholder.remove();
+            returnPlaceholderDiv(mi.placeholder);//mi.placeholder.remove();
             mi.placeholder = null;
         }
 
@@ -1717,17 +1728,17 @@
             fragment = document.createDocumentFragment(),
             nodes = [];
 
-            tmp = fragment.appendChild(document.createElement("div"));
+        tmp = fragment.appendChild(document.createElement("div"));
 
-            tmp.innerHTML = str.replace(rxhtmlTag, "<$1></$2>") ;
+        tmp.innerHTML = str.replace(rxhtmlTag, "<$1></$2>") ;
 
-            for(i = 0; i < tmp.childNodes.length; i++) {
-                nodes.push(tmp.childNodes[i]);
-            }
+        for(i = 0; i < tmp.childNodes.length; i++) {
+            nodes.push(tmp.childNodes[i]);
+        }
 
-            tmp = fragment.firstChild;
-            tmp.textContent = "";
-            fragment.textContent = "";
+        tmp = fragment.firstChild;
+        tmp.textContent = "";
+        fragment.textContent = "";
 
         i = 0;
         while ((elem = nodes[i++])) {
@@ -1756,7 +1767,18 @@
         return result;
     }
 
+    function clonedToDiv(node){
 
+        if(!node) return null;
+        var fragment = document.createDocumentFragment();
+        var div = document.createElement("div");
+        fragment.appendChild(div);
+        var children = node.children;
+        while(children.length){
+            div.appendChild(children[0]);
+        }
+        return div;
+    }
 
 
     function clonedArrayOfChildNodes(node){
@@ -1802,9 +1824,12 @@
 
         var blueSel = childNodesByName(frag.querySelector('blueprint'));//responseSel.filter("blueprint");
         var scriptSel = frag.querySelector('script'); //responseSel.filter("script");
-        var htmlSel = clonedArrayOfChildNodes(frag.querySelector('display'));// responseSel.filter("display").children().clone();
+        //var htmlSel = clonedArrayOfChildNodes(frag.querySelector('display'));// responseSel.filter("display").children().clone();
 
-        htmlSel.prevObject = null; // note: avoids terrible jquery bug, holding scary DOM references
+        var htmlSel = clonedToDiv(frag.querySelector('display'));// responseSel.filter("display").children().clone();
+
+        if(htmlSel)
+            htmlSel.prevObject = null; // note: avoids terrible jquery bug, holding scary DOM references
 
         var scriptText= scriptSel && scriptSel.innerHTML;
 
@@ -1822,7 +1847,7 @@
         if(!activeScriptData)
             throw new Error("Script Data Failure:" + url);
 
-        if(htmlSel.length > 0)
+        if(htmlSel && htmlSel.hasChildNodes())
             cacheMap[url] = htmlSel; //.clone();
         declarationMap[url] = extractDeclarations(blueSel);
 
@@ -1838,10 +1863,16 @@
         console.log("PARSE ERROR:"+dataType+":"+propName+":"+activeProcessURL);
     }
 
-    function parseElementIds(sel, scriptData){
-        sel = $(sel);
-        var idSels = sel.find("[id]").add(sel.filter('[id]'));
-        var ids = idSels.map(function() { return this.id; }).get();
+    function parseElementIds(display, scriptData){
+
+        var nodes = (display && display.querySelectorAll('[id')) || [];
+        var ids = [];
+        for(var i = 0; i < nodes.length; i++){
+            ids.push(nodes[i].id);
+        }
+        //sel = $(sel);
+        //var idSels = sel.find("[id]").add(sel.filter('[id]'));
+        //var ids = idSels.map(function() { return this.id; }).get();
         scriptData._ids = ids;
     }
 
@@ -2593,6 +2624,34 @@
 
     Service.prototype.parse = function(parseFunc) {
         return this._defaultFeed.parse(parseFunc);
+    };
+
+    var Rei = function(element){
+        this._element = element;
+    };
+
+    Rei.prototype.css = function(nameOrOptions, value){
+        var style = this._element.style;
+        if(arguments.length === 0) return style;
+        if(arguments.length === 2) {
+            style[nameOrOptions] = value;
+        } else {
+            for(var p in nameOrOptions){
+                style[p] = nameOrOptions[p];
+            }
+        }
+    };
+
+    Rei.prototype.attr = function(nameOrOptions, value){
+        var attributes = this._element.attributes;
+        if(arguments.length === 0) return attributes;
+        if(arguments.length === 2) {
+            this._element.setAttribute(nameOrOptions, value);
+        } else {
+            for(var p in nameOrOptions){
+                this._element.setAttribute(p, nameOrOptions[p]);
+            }
+        }
     };
 
     var WebService = function() {
