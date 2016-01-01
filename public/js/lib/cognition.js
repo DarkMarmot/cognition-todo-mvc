@@ -1,7 +1,7 @@
 ;(function($) {
 
     /**
-     * cognition.js (v1.1.1-parsie)
+     * cognition.js (v1.1.1-rei)
      *
      * Copyright (c) 2015 Scott Southworth, Landon Barnickle, Nick Lorenson & Contributors
      *
@@ -1433,7 +1433,7 @@
             var nodes = display.querySelectorAll('[id]');
             for(var i = 0; i < nodes.length; i++){
                 var node = nodes[i];
-                scriptData[node.id] = $(node);
+                scriptData[node.id] = new Rei(node);
                 node.setAttribute('id', mi.uid + '_' + node.id);
             }
 
@@ -2629,6 +2629,59 @@
     var Rei = function(element){
         this._element = element;
     };
+
+    Rei.prototype.detect = catbus.$.detect;
+
+    Rei.prototype.append = function(element){
+        if(element.length && element.length === 1)
+            element = element[0];
+        this._element.appendChild(element);
+    };
+
+    Rei.prototype.focus = function(){
+        this._element.focus();
+    };
+
+    Rei.prototype.val = function(value){
+        if(arguments.length === 0)
+            return this._element.value;
+
+        this._element.value = value;
+    };
+
+    Rei.prototype.toggle = function(visibility){
+        this._element.style.visibility = visibility ? 'visible' : 'hidden';
+    };
+
+    Rei.prototype.text = function(text){
+        this._element.textContent = text;
+    };
+
+    Rei.prototype.on = function(type, handler, useCapture){
+        this._element.addEventListener(type, handler, useCapture);
+    };
+
+    Rei.prototype.toggleClass = function(){
+       var arg_array = [];
+        for(var i = 0; i < arguments.length; i++){
+            arg_array.push(arguments[i]);
+        }
+        var class_list = this._element.classList;
+        return class_list.toggle.apply(class_list, arg_array);
+    };
+
+    Rei.prototype.prop = function(nameOrOptions, value){
+        var element = this._element;
+        if(arguments.length === 0) return element;
+        if(arguments.length === 2) {
+            element[nameOrOptions] = value;
+        } else {
+            for(var p in nameOrOptions){
+                element[p] = nameOrOptions[p];
+            }
+        }
+    };
+
 
     Rei.prototype.css = function(nameOrOptions, value){
         var style = this._element.style;

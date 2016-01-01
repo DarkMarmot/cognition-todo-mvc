@@ -26,7 +26,7 @@
     $.cog({
 
         init: function(){
-            this.itemView[0].onselectstart = function(){
+            this.itemView._element.onselectstart = function(){
                 return false;
             };
         },
