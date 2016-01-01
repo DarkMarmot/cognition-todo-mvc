@@ -1,7 +1,7 @@
 ;(function($) {
 
     /**
-     * cognition.js (v1.1.1-rei)
+     * cognition.js (v1.1.2-rei)
      *
      * Copyright (c) 2015 Scott Southworth, Landon Barnickle, Nick Lorenson & Contributors
      *
@@ -1066,7 +1066,7 @@
         mi.scriptData.mapItem = mi;
         self.childMap[mi.uid] = mi;
 
-        mi.placeholder = $(getPlaceholderDiv()); // $('<div style="display: none;"></div>');
+        mi.placeholder = getPlaceholderDiv(); // $('<div style="display: none;"></div>');
         self.targetNode.append(mi.placeholder);
 
         if(self.itemType === DATA) {
@@ -1111,7 +1111,7 @@
 
             mi.url = this._resolveValueFromType(mi.url, mi.urlType);
             if(!placeholder) {
-                mi.placeholder = $(getPlaceholderDiv()); // $('<div style="display: none;"></div>');
+                mi.placeholder = getPlaceholderDiv(); // $('<div style="display: none;"></div>');
                 if(!mi.target){
                     console.log('error1! -- would need last from localsel??',self, self.resolvedUrl, self.localSel);
                     // was: mi.targetNode = (mi.target) ? self.scriptData[mi.target] : self.localSel.last();
@@ -1467,7 +1467,7 @@
             url: url
         };
 
-        var placeholder = $(getPlaceholderDiv()); // $('<div style="display: none;"></div>');
+        var placeholder = getPlaceholderDiv(); // $('<div style="display: none;"></div>');
         mi.targetNode.append(placeholder);
         mi.createCog(def, placeholder);
 
@@ -1506,8 +1506,8 @@
         mi._requirementsLoaded = true;
 
         if(mi.placeholder){
-           // mi.placeholder.replaceWith(mi.display);
-            mi.placeholder.after(mi.localSel);
+            mi.placeholder.replaceWith(mi.display);
+            //mi.placeholder.after(mi.localSel);
             returnPlaceholderDiv(mi.placeholder);//mi.placeholder.remove();
             mi.placeholder = null;
         }
@@ -1714,15 +1714,13 @@
     function getPlaceholderDiv(){
         if(placeholderDivPool.length > 0)
             return placeholderDivPool.pop();
-        return placeholderDiv.cloneNode(false);
+        return new Rei(placeholderDiv.cloneNode(false));
     }
 
     function returnPlaceholderDiv(div){
         div = (div.length) ? div[0] : div; // fix this with jquery removal
-        if (div.parentNode) {
-            div.parentNode.removeChild(div);
-            placeholderDivPool.push(div);
-        }
+        div.remove();
+        placeholderDivPool.push(div);
     }
 
     function buildPlaceholderDiv(){
@@ -1779,17 +1777,15 @@
         return result;
     }
 
-    function clonedToDiv(node){
+    function unwrapDisplay(display){ //
 
-        if(!node) return null;
+        if(!display) return null;
         var fragment = document.createDocumentFragment();
-        var div = document.createElement("div");
-        fragment.appendChild(div);
-        var children = node.children;
+        var children = display.children;
         while(children.length){
-            div.appendChild(children[0]);
+            fragment.appendChild(children[0]);
         }
-        return div;
+        return fragment;
     }
 
 
@@ -1832,16 +1828,9 @@
 
         activeProcessURL = url;
 
-        var responseSel = $(response);
-
         var blueSel = childNodesByName(frag.querySelector('blueprint'));//responseSel.filter("blueprint");
         var scriptSel = frag.querySelector('script'); //responseSel.filter("script");
-        //var htmlSel = clonedArrayOfChildNodes(frag.querySelector('display'));// responseSel.filter("display").children().clone();
-
-        var htmlSel = clonedToDiv(frag.querySelector('display'));// responseSel.filter("display").children().clone();
-
-        if(htmlSel)
-            htmlSel.prevObject = null; // note: avoids terrible jquery bug, holding scary DOM references
+        var htmlSel = unwrapDisplay(frag.querySelector('display'));// responseSel.filter("display").children().clone();
 
         var scriptText= scriptSel && scriptSel.innerHTML;
 
@@ -2649,6 +2638,8 @@
     Rei.prototype.append = function(element){
         if(element.length && element.length === 1)
             element = element[0];
+        else if(element._element)
+            element = element._element;
         this._element.appendChild(element);
     };
 
@@ -2678,6 +2669,14 @@
 
     Rei.prototype.on = function(type, handler, useCapture){
         this._element.addEventListener(type, handler, useCapture);
+    };
+
+    Rei.prototype.remove = function(){
+        var element = this._element;
+        if(element.parentNode){
+            element.parentNode.removeChild(element);
+        }
+        return element;
     };
 
     Rei.prototype.toggleClass = function(){
