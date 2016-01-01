@@ -1112,7 +1112,11 @@
             mi.url = this._resolveValueFromType(mi.url, mi.urlType);
             if(!placeholder) {
                 mi.placeholder = $(getPlaceholderDiv()); // $('<div style="display: none;"></div>');
-                mi.targetNode = (mi.target) ? self.scriptData[mi.target] : self.localSel.last();
+                if(!mi.target){
+                    console.log('error1! -- would need last from localsel??',self, self.resolvedUrl, self.localSel);
+                    // was: mi.targetNode = (mi.target) ? self.scriptData[mi.target] : self.localSel.last();
+                }
+                mi.targetNode = (mi.target) ? self.scriptData[mi.target] : new Rei(self.localSel.last()[0]);
                 mi.targetNode.append(mi.placeholder);  //[mi.action](mi.placeholder);
             } else {
                 mi.placeholder = placeholder;
@@ -1123,7 +1127,13 @@
 
             mi.isPinion = true;
             mi._requirementsLoaded = true;
-            mi.targetNode = (mi.target) ? self.scriptData[mi.target] : self.localSel.last();
+
+            if(!mi.target){
+                console.log('error! -- would need last from localsel??');
+                // was: mi.targetNode = (mi.target) ? self.scriptData[mi.target] : self.localSel.last();
+            }
+
+            mi.targetNode = self.scriptData[mi.target];
             mi.urlFromPlace = mi.cogZone.findData(mi.url).on('update').change().as(mi).host(mi.uid).run(mi._cogControlUrl).autorun();
 
         }
@@ -1496,6 +1506,7 @@
         mi._requirementsLoaded = true;
 
         if(mi.placeholder){
+           // mi.placeholder.replaceWith(mi.display);
             mi.placeholder.after(mi.localSel);
             returnPlaceholderDiv(mi.placeholder);//mi.placeholder.remove();
             mi.placeholder = null;
@@ -1707,6 +1718,7 @@
     }
 
     function returnPlaceholderDiv(div){
+        div = (div.length) ? div[0] : div; // fix this with jquery removal
         if (div.parentNode) {
             div.parentNode.removeChild(div);
             placeholderDivPool.push(div);
@@ -1911,8 +1923,10 @@
 
     MapItem.prototype.clearContent = function(){
         destroyInnerMapItems(this);
-        if(this.localSel)
-            this.localSel.empty();
+        if(this.localSel){
+            console.log('clear issue!!! -- expecting this to be pinion without local content');
+            // this.localSel.empty();
+        }
     };
 
 
@@ -2636,6 +2650,11 @@
         if(element.length && element.length === 1)
             element = element[0];
         this._element.appendChild(element);
+    };
+
+    Rei.prototype.replaceWith = function(element){
+        var ref = this._element;
+        ref.parentNode.replaceChild(element, ref);
     };
 
     Rei.prototype.focus = function(){
