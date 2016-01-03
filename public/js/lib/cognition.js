@@ -67,7 +67,6 @@
 
     var defaultScriptDataPrototype = {
 
-        _ids: {},
         enter: function () {
         },
         update: function () {
@@ -179,7 +178,6 @@
         var stored = contentMap[mapItem.uid];
         if(stored === mapItem) {
             delete contentMap[mapItem.uid];
-            // console.log("destroyed " + mapItem.uid);
         }
 
     }
@@ -1498,7 +1496,6 @@
         var mi = this;
 
         if(!mi.isAlloy) {
-            // mi._generateDomIds();
             mi._determineAlloys();
             mi._exposeAlloys();
         }
@@ -1507,8 +1504,7 @@
 
         if(mi.placeholder){
             mi.placeholder.replaceWith(mi.display);
-            //mi.placeholder.after(mi.localSel);
-            returnPlaceholderDiv(mi.placeholder);//mi.placeholder.remove();
+            returnPlaceholderDiv(mi.placeholder);
             mi.placeholder = null;
         }
 
@@ -1520,24 +1516,6 @@
     };
 
 
-    MapItem.prototype._generateDomIds = function(){
-        var scriptData = this.scriptData;
-        var ids = scriptData._ids;
-        if(!ids || !ids.length) return;
-        var sel = this.localSel;
-        for(var i = 0; i < ids.length; i++){
-            var id = ids[i];
-            var el = sel.find("#"+id);
-            if(!el.length)
-                el = sel.filter('#'+id);
-            el.attr("id",this.uid+"_"+id);
-            // TODO this camel stuff looks dumb, please fix or remove it
-            var camelId = id.replace(/-([a-z])/g, function (g) { return g[1].toUpperCase(); });
-            scriptData[camelId] = el;
-
-        }
-
-    };
 
     MapItem.prototype._cogRequirementReady = function(urlReady) {
 
@@ -1854,8 +1832,6 @@
 
         scriptMap[url] = activeScriptData;
 
-        parseElementIds(htmlSel, activeScriptData);
-
         activeScriptData = null;
 
     }
@@ -1864,18 +1840,6 @@
         console.log("PARSE ERROR:"+dataType+":"+propName+":"+activeProcessURL);
     }
 
-    function parseElementIds(display, scriptData){
-
-        var nodes = (display && display.querySelectorAll('[id')) || [];
-        var ids = [];
-        for(var i = 0; i < nodes.length; i++){
-            ids.push(nodes[i].id);
-        }
-        //sel = $(sel);
-        //var idSels = sel.find("[id]").add(sel.filter('[id]'));
-        //var ids = idSels.map(function() { return this.id; }).get();
-        scriptData._ids = ids;
-    }
 
     function wrapScript(scriptText, url) {
         return scriptText + "\n//# sourceURL=http://cognition" + url + "";
