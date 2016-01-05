@@ -1,7 +1,7 @@
 ;(function($) {
 
     /**
-     * cognition.js (v1.1.2-rei)
+     * cognition.js (v1.1.5-rei)
      *
      * Copyright (c) 2015 Scott Southworth, Landon Barnickle, Nick Lorenson & Contributors
      *
@@ -24,7 +24,6 @@
     var uid = 0;
 
     var COG_ROOT = bus.demandTree('COG_ROOT');
-    var ALIAS_ROOT= bus.demandTree('ALIAS_ROOT');
 
     var buildNum = 'NEED_BUILD_NUM';
 
@@ -124,7 +123,6 @@
     cognition.init = function (sel, url, debugUrl){
 
         var root = cognition.root = new MapItem();
-        root.aliasZone = ALIAS_ROOT;
         root.cogZone = COG_ROOT;
 
 
@@ -812,7 +810,6 @@
     var MapItem = function() {
 
         this.cogZone = null;
-        this.aliasZone = null;
         this.origin = null; // hosting cog if this is an alloy
 
         this.isAlloy = false; // hoisted cog defining behaviors or mixin style features
@@ -843,7 +840,6 @@
         this.requirements = [];
         this.requirementsSeen = {};
         this.itemData = null;
-        this.lastData = null;
         this.itemKey = null;
         this._declarationDefs = null;
 
@@ -1055,7 +1051,6 @@
         var mi = new MapItem();
 
         mi.cogZone = self.cogZone.demandChild();
-        mi.aliasZone = self.aliasZone.demandChild();
         mi.url = url;
         mi.itemData = data;
         mi.itemKey = key;
@@ -1083,7 +1078,6 @@
         var mi = new MapItem();
 
         mi.cogZone = def.isRoute ? self.cogZone.demandChild(def.name, def.isRoute) : self.cogZone.demandChild(def.name);
-        mi.aliasZone = self.aliasZone.demandChild();
 
         mi.target = def.target;
         mi.action = def.action || 'append';
@@ -1114,7 +1108,7 @@
                     console.log('error1! -- would need last from localsel??',self, self.resolvedUrl, self.localSel);
                     // was: mi.targetNode = (mi.target) ? self.scriptData[mi.target] : self.localSel.last();
                 }
-                mi.targetNode = (mi.target) ? self.scriptData[mi.target] : new Rei(self.localSel.last()[0]);
+                mi.targetNode = (mi.target) ? self.scriptData[mi.target] : Rei(self.localSel.last()[0]);
                 mi.targetNode.append(mi.placeholder);  //[mi.action](mi.placeholder);
             } else {
                 mi.placeholder = placeholder;
@@ -1147,7 +1141,6 @@
         var mi = new MapItem();
 
         mi.cogZone = self.cogZone.demandChild();
-        mi.aliasZone = self.aliasZone.demandChild();
         mi.isChain = true;
         mi.build = def.build;
         mi.order = def.order;
@@ -1188,7 +1181,6 @@
         var alloy = new MapItem();
 
         alloy.cogZone = def.isRoute ? self.cogZone.demandChild(def.name, def.isRoute) : self.cogZone.demandChild(def.name);
-        alloy.aliasZone = self.aliasZone.demandChild();
 
         alloy.origin = self; // cog that hosts this alloy
         alloy.isAlloy = true;
@@ -1208,7 +1200,6 @@
         alloy.childMap[self.uid] = self;
 
         self.cogZone.insertParent(alloy.cogZone);
-        self.aliasZone.insertParent(alloy.aliasZone);
 
         alloy._cogAssignUrl(def.url);
         alloy._cogBecomeUrl();
@@ -1432,8 +1423,6 @@
 
         var scriptData = mi.scriptData;
 
-
-
         if(mi.isAlloy)
             mi._cogInitialize();
         else {
@@ -1441,7 +1430,7 @@
             var nodes = display.querySelectorAll('[id]');
             for(var i = 0; i < nodes.length; i++){
                 var node = nodes[i];
-                scriptData[node.id] = new Rei(node);
+                scriptData[node.id] = Rei(node);
                 node.setAttribute('id', mi.uid + '_' + node.id);
             }
 
@@ -1692,7 +1681,7 @@
     function getPlaceholderDiv(){
         if(placeholderDivPool.length > 0)
             return placeholderDivPool.pop();
-        return new Rei(placeholderDiv.cloneNode(false));
+        return Rei(placeholderDiv.cloneNode(false));
     }
 
     function returnPlaceholderDiv(div){
@@ -2593,50 +2582,106 @@
         return this._defaultFeed.parse(parseFunc);
     };
 
-    var Rei = function(element){
-        this._element = element;
+    var Rei = function(domish){  // element, node, Rei, fragment or array-like (to fragment)
+        return new Rei.prototype.init(domish);
+    };
+
+    Rei.prototype.init = function(domish){
+        this._memory = {};
+        this._content = this[0] = this._toContent(domish);
+        this._solo = this._content.nodeType !== 11;
+    };
+
+    Rei.prototype.init.prototype = Rei.prototype;
+
+    Rei.prototype.rawContent = Rei.prototype.raw = function(){
+        return this._content;
+    };
+
+    Rei.prototype._toContent = function(domish){
+        if(domish._content)
+            return domish._content;
+        var nonArray = domish.length ? this.arrayToFragment(domish) : domish; // arrays become a fragment of nodes
+        return (nonArray.nodeType === 11 && nonArray.children.length === 1) ? nonArray.children[0] : nonArray;
+    };
+
+    Rei.prototype.arrayToFragment = function(domish){
+
+        var fragment = document.createDocumentFragment();
+        for(var i = 0; i < domish.length; i++){
+            var element = domish[i];
+            fragment.appendChild(element._content || element); // convert Reis back to elements
+        }
+        return fragment;
     };
 
     Rei.prototype.detect = catbus.$.detect;
 
-    Rei.prototype.append = function(element){
-        if(element.length && element.length === 1)
-            element = element[0];
-        else if(element._element)
-            element = element._element;
-        this._element.appendChild(element);
+    Rei.prototype.append = function(domish){
+        if(!this._solo)
+            throw new Error('cannot append to a multi-node fragment!');
+        var child = this._toContent(domish);
+        this._content.appendChild(child);
     };
 
-    Rei.prototype.replaceWith = function(element){
-        var ref = this._element;
-        ref.parentNode.replaceChild(element, ref);
+    Rei.prototype.replaceWith = function(domish){
+        var newContent = this._toContent(domish);
+        var content = this._content;
+        content.parentNode.replaceChild(newContent, content);
     };
 
     Rei.prototype.focus = function(){
-        this._element.focus();
+        if(!this._solo)
+            throw new Error('cannot focus on a multi-node fragment!');
+        this._content.focus();
     };
 
     Rei.prototype.val = function(value){
         if(arguments.length === 0)
-            return this._element.value;
+            return this._content.value;
 
-        this._element.value = value;
+        this._content.value = value;
     };
 
-    Rei.prototype.toggle = function(visibility){
-        this._element.style.visibility = visibility ? 'visible' : 'hidden';
+    Rei.prototype.toggle = function(show, display){
+        if(arguments.length === 0)
+            throw new Error('toggle should always include an argument to avoid indeterminate display results');
+        return show ? this.show(display) : this.hide();
+    };
+
+    Rei.prototype.show = function(display){
+        if(arguments.length === 0 && !this._memory.display)
+            throw new Error('toggle should include an argument to avoid indeterminate display results');
+        this._content.style.display = display || this._memory.display;
+        return this;
+    };
+
+    Rei.prototype.hide = function(){
+        if(this._content.style.display === 'none')
+            return this;
+
+        this._memory.display =  this._content.style.display;
+        this._content.style.display = 'none';
+    };
+
+    Rei.prototype.vis = function(visibility){
+        this._content.style.visibility = visibility ? 'visible' : 'hidden';
     };
 
     Rei.prototype.text = function(text){
-        this._element.textContent = text;
+        this._content.textContent = text;
     };
 
     Rei.prototype.on = function(type, handler, useCapture){
-        this._element.addEventListener(type, handler, useCapture);
+        this._content.addEventListener(type, handler, useCapture);
+    };
+
+    Rei.prototype.off = function(type, handler, useCapture){
+        this._content.removeEventListener(type, handler, useCapture);
     };
 
     Rei.prototype.remove = function(){
-        var element = this._element;
+        var element = this._content;
         if(element.parentNode){
             element.parentNode.removeChild(element);
         }
@@ -2648,12 +2693,56 @@
         for(var i = 0; i < arguments.length; i++){
             arg_array.push(arguments[i]);
         }
-        var class_list = this._element.classList;
+        var class_list = this._content.classList;
         return class_list.toggle.apply(class_list, arg_array);
     };
 
+    Rei.prototype.addClass = function(names){
+        var arr = names.split(' ');
+        for(var i = 0; i < arr.length; i++){
+            this._addClass(arr[i]);
+        }
+        return this;
+    };
+
+    Rei.prototype._addClass = function(name){
+        var class_list = this._content.classList;
+        if(!class_list.contains(name))
+            class_list.add(name);
+    };
+
+    Rei.prototype.removeClass = function(names){
+        if(!names){
+            this.removeAllClasses();
+            return this;
+        }
+        var arr = names.split(' ');
+        for(var i = 0; i < arr.length; i++){
+            this._removeClass(arr[i]);
+        }
+        return this;
+    };
+
+
+    Rei.prototype.removeAllClasses = function(){
+        var arr = [];
+        var list = this._content.classList;
+        for(var i = 0; i < list.length; i++){
+            arr.push(list.item(i));
+        }
+        if(arr.length > 0)
+            this.removeClass(arr.join(' '));
+        return this;
+    };
+
+    Rei.prototype._removeClass = function(name){
+        var class_list = this._content.classList;
+        if(class_list.contains(name))
+            class_list.remove(name);
+    };
+
     Rei.prototype.prop = function(nameOrOptions, value){
-        var element = this._element;
+        var element = this._content;
         if(arguments.length === 0) return element;
         if(arguments.length === 2) {
             element[nameOrOptions] = value;
@@ -2665,26 +2754,34 @@
     };
 
 
+    Rei.prototype.get = function(n){
+        return this._solo ? this._content : this._content.children[n];
+    };
+
     Rei.prototype.css = function(nameOrOptions, value){
-        var style = this._element.style;
+        var style = this._content.style;
         if(arguments.length === 0) return style;
         if(arguments.length === 2) {
-            style[nameOrOptions] = value;
+            style[nameOrOptions] = value + '';
         } else {
+            if(typeof nameOrOptions === 'string')
+                return this._content.style[nameOrOptions];
             for(var p in nameOrOptions){
-                style[p] = nameOrOptions[p];
+                style[p] = nameOrOptions[p] + '';
             }
         }
     };
 
     Rei.prototype.attr = function(nameOrOptions, value){
-        var attributes = this._element.attributes;
+        var attributes = this._content.attributes;
         if(arguments.length === 0) return attributes;
         if(arguments.length === 2) {
-            this._element.setAttribute(nameOrOptions, value);
+            this._content.setAttribute(nameOrOptions, value);
         } else {
+            if(typeof nameOrOptions === 'string')
+                return this._content.getAttribute(nameOrOptions);
             for(var p in nameOrOptions){
-                this._element.setAttribute(p, nameOrOptions[p]);
+                this._content.setAttribute(p, nameOrOptions[p]);
             }
         }
     };
