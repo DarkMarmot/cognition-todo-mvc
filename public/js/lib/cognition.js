@@ -1,7 +1,7 @@
-;(function($) {
+;(function($, window) {
 
     /**
-     * cognition.js (v1.1.5-rei)
+     * cognition.js (v1.4.0-rei replace jq)
      *
      * Copyright (c) 2015 Scott Southworth, Landon Barnickle, Nick Lorenson & Contributors
      *
@@ -89,6 +89,7 @@
     var contentMap = {}; // layout map, built from n-item hierarchy
     var cacheMap = {}; // cache of content url loads
     var declarationMap = {}; // arrays of strategy directives
+    var fileContextMap = {}; // alias context id + resolved url, true  when requirements done
     var libraryMap = {}; // by resolvedUrl, javascript files processed (don't run again)
 
     var scriptMap = {}; // prototypes
@@ -120,11 +121,10 @@
         });
     };
 
-    cognition.init = function (sel, url, debugUrl){
+    cognition.init = function (node, url, debugUrl){
 
         var root = cognition.root = new MapItem();
         root.cogZone = COG_ROOT;
-
 
         bus.defineDeepLinker('lzs', function(dir){ return LZString.compressToEncodedURIComponent(JSON.stringify(dir))},
             function(str){ return JSON.parse(LZString.decompressFromEncodedURIComponent(str))});
@@ -134,7 +134,9 @@
         if(directions)
             COG_ROOT.demandData('__DIRECTIONS__').write(directions);
 
-        root.localSel = sel;
+        root.localSel = Rei(node);
+        root.targetNode = Rei(node);
+        root.isPinion = true;
         root.createCog({url:url});
         if(debugUrl)
             root.createCog({url: debugUrl});
@@ -829,6 +831,8 @@
         this.serviceMap = {};
         this.feedMap = {};
         this.aliasMap = {};
+        this.aliasProto = null; // alias map at creation, from parent.aliasFinal
+        this.aliasFinal = null; // alias map after local alias inclusion
         this.dataMap = {};
         this.valveMap = null;
         this.methodMap = {};
@@ -1007,6 +1011,21 @@
 
     };
 
+    MapItem.prototype._cogApplyAliases = function(){
+        var localAliases = this._declarationDefs.aliases;
+        //var localValves = this._declarationDefs.valves;
+        if(localAliases.length === 0){//} && localValves.length === 0){
+            this.aliasFinal = this.aliasProto; // no changes
+            return;
+        }
+
+        var final = {};
+        var proto = this.aliasProto.aliases;
+        for(var p in proto){
+            final[p] = proto[p];
+        }
+
+    };
 
     MapItem.prototype._cogBuildDeclarations = function(){
 
@@ -1056,6 +1075,7 @@
         mi.itemKey = key;
         mi.itemOrder = index;
         mi.parent = self;
+        mi.aliasProto = self.aliasFinal;
         mi.scriptData.mapItem = mi;
         self.childMap[mi.uid] = mi;
 
@@ -1071,6 +1091,9 @@
 
     };
 
+    function createAliasMapContext() {
+        var map = {id: ++uid, aliases: {}};
+    };
 
     MapItem.prototype.createCog = function(def, placeholder){
 
@@ -1092,23 +1115,24 @@
 
         mi.path = (def.path) ? self._resolvePath(def.path) : null;
         mi.parent = self;
+
         mi.scriptData.mapItem = mi;
         self.childMap[mi.uid] = mi;
-
-        if(def.adapter)
-            mi.adapter = this._resolveValueFromType(def.adapter, def.adapterType);
-
 
         if(mi.urlType !== 'data') {
 
             mi.url = this._resolveValueFromType(mi.url, mi.urlType);
+            //mi._cogAssignUrl(mi.url);
+
             if(!placeholder) {
-                mi.placeholder = getPlaceholderDiv(); // $('<div style="display: none;"></div>');
-                if(!mi.target){
+
+                mi.placeholder = getPlaceholderDiv();
+                if(!mi.target && !self.targetNode){
                     console.log('error1! -- would need last from localsel??',self, self.resolvedUrl, self.localSel);
                     // was: mi.targetNode = (mi.target) ? self.scriptData[mi.target] : self.localSel.last();
                 }
-                mi.targetNode = (mi.target) ? self.scriptData[mi.target] : Rei(self.localSel.last()[0]);
+                mi.targetNode = (self.isPinion) ? self.targetNode : (
+                    (mi.target) ? self.scriptData[mi.target] : Rei(self.localSel.last()[0]));
                 mi.targetNode.append(mi.placeholder);  //[mi.action](mi.placeholder);
             } else {
                 mi.placeholder = placeholder;
@@ -1117,6 +1141,7 @@
 
         } else {
 
+            // todo make a createPinion function for clarity ???
             mi.isPinion = true;
             mi._requirementsLoaded = true;
 
@@ -1125,8 +1150,9 @@
                 // was: mi.targetNode = (mi.target) ? self.scriptData[mi.target] : self.localSel.last();
             }
 
+            mi.aliasFinal = mi.aliasProto;
             mi.targetNode = self.scriptData[mi.target];
-            mi.urlFromPlace = mi.cogZone.findData(mi.url).on('update').change().as(mi).host(mi.uid).run(mi._cogControlUrl).autorun();
+            mi.urlFromPlace = mi.cogZone.findData(mi.url).on('update').change().as(mi).host(mi.uid).run(mi._cogReplaceUrl).autorun();
 
         }
 
@@ -1155,9 +1181,9 @@
         mi.url =  def.url;
         mi.path = (def.path) ? self._resolvePath(def.path) : null;
         mi.parent = self;
+        mi.aliasProto = mi.aliasFinal = self.aliasFinal; // new aliases can't be defined in a chain
         mi.scriptData.mapItem = mi;
         self.childMap[mi.uid] = mi;
-
 
         mi.targetNode = self.scriptData[mi.target];
 
@@ -1406,6 +1432,11 @@
 
     };
 
+    function camelCase(str){
+            return str.replace( /-([a-z])/ig, function( all, letter ) {
+                return letter.toUpperCase();
+            } );
+    }
 
     MapItem.prototype._cogBecomeUrl = function(){
 
@@ -1430,11 +1461,12 @@
             var nodes = display.querySelectorAll('[id]');
             for(var i = 0; i < nodes.length; i++){
                 var node = nodes[i];
-                scriptData[node.id] = Rei(node);
-                node.setAttribute('id', mi.uid + '_' + node.id);
+                var cameCaseName = camelCase(node.id);
+                scriptData[cameCaseName] = Rei(node);
+                node.setAttribute('id', mi.uid + '_' + cameCaseName);
             }
 
-            mi.localSel = $(mi.display.childNodes); //$(clonedArrayOfNodeList(htmlSel));  //htmlSel.clone();
+            mi.localSel = Rei(display); //$(mi.display.childNodes); //$(clonedArrayOfNodeList(htmlSel));  //htmlSel.clone();
             mi._cogRequestRequirements();
         }
 
@@ -1442,21 +1474,12 @@
 
 
 
-    MapItem.prototype._cogControlUrl = function(url){
+    MapItem.prototype._cogReplaceUrl = function(url){
 
-        var mi = this;
-        mi.clearContent();
+        this.clearContent();
 
-        if(!url)
-            return;
-
-        var def = {
-            url: url
-        };
-
-        var placeholder = getPlaceholderDiv(); // $('<div style="display: none;"></div>');
-        mi.targetNode.append(placeholder);
-        mi.createCog(def, placeholder);
+        if(url)
+            this.createCog({url: url});
 
     };
 
@@ -1484,6 +1507,7 @@
 
         var mi = this;
 
+
         if(!mi.isAlloy) {
             mi._determineAlloys();
             mi._exposeAlloys();
@@ -1496,6 +1520,7 @@
             returnPlaceholderDiv(mi.placeholder);
             mi.placeholder = null;
         }
+
 
         if(mi.source)
             mi._resolveSource();
@@ -1791,13 +1816,12 @@
 
 
         var frag = buildFragment(response);
-        //console.log(frag);
 
         activeProcessURL = url;
 
-        var blueSel = childNodesByName(frag.querySelector('blueprint'));//responseSel.filter("blueprint");
-        var scriptSel = frag.querySelector('script'); //responseSel.filter("script");
-        var htmlSel = unwrapDisplay(frag.querySelector('display'));// responseSel.filter("display").children().clone();
+        var blueSel = childNodesByName(frag.querySelector('blueprint'));
+        var scriptSel = frag.querySelector('script');
+        var htmlSel = unwrapDisplay(frag.querySelector('display'));
 
         var scriptText= scriptSel && scriptSel.innerHTML;
 
@@ -1816,7 +1840,7 @@
             throw new Error("Script Data Failure:" + url);
 
         if(htmlSel && htmlSel.hasChildNodes())
-            cacheMap[url] = htmlSel; //.clone();
+            cacheMap[url] = htmlSel;
         declarationMap[url] = extractDeclarations(blueSel);
 
         scriptMap[url] = activeScriptData;
@@ -2583,142 +2607,266 @@
     };
 
     var Rei = function(domish){  // element, node, Rei, fragment or array-like (to fragment)
+        if(domish._dom)
+            return domish; // Rei returns itself if duck-wrapped
         return new Rei.prototype.init(domish);
     };
 
+    window.Rei = Rei;
+
     Rei.prototype.init = function(domish){
         this._memory = {};
-        this._content = this[0] = this._toContent(domish);
-        this._solo = this._content.nodeType !== 11;
+        this._nodes = [];
+        this._dom = this._fromDom(domish); // pushes nodes as created for performance
+        this[0] = this._nodes[0];
     };
 
     Rei.prototype.init.prototype = Rei.prototype;
 
     Rei.prototype.rawContent = Rei.prototype.raw = function(){
-        return this._content;
+        return this[0];
     };
 
-    Rei.prototype._toContent = function(domish){
-        if(domish._content)
-            return domish._content;
-        var nonArray = domish.length ? this.arrayToFragment(domish) : domish; // arrays become a fragment of nodes
-        return (nonArray.nodeType === 11 && nonArray.children.length === 1) ? nonArray.children[0] : nonArray;
-    };
 
-    Rei.prototype.arrayToFragment = function(domish){
 
-        var fragment = document.createDocumentFragment();
-        for(var i = 0; i < domish.length; i++){
-            var element = domish[i];
-            fragment.appendChild(element._content || element); // convert Reis back to elements
+    Rei.prototype._fromDom = function(domish){
+
+        var i, frag, children, count, node;
+        var nodes = this._nodes;
+
+        domish = domish._dom || domish; // remove Rei content wrapper if present
+
+        if(domish.nodeType === 1) { // element node
+            nodes.push(domish);
+            return domish;
         }
-        return fragment;
+
+        if(domish.nodeType === 11) { // element/frag node
+            children = domish.children;
+            count = children.length;
+            for(i = 0; i < count; i++){
+                nodes.push(children[i]);
+            }
+            return (count === 1) ? nodes[0] : domish;
+        }
+
+        if(Array.isArray(domish) || domish.length) {
+
+            count = domish.length;
+            for(i = 0; i < count; i++){
+                node = domish[i];
+                nodes.push(node._dom || node); // convert Reis back to elements
+            }
+
+            if(count === 1)
+                return nodes[0];
+
+            frag = document.createDocumentFragment();
+            for(i = 0; i < count; i++){
+                node = nodes[i];
+                frag.appendChild(node); // convert Reis back to elements
+            }
+            return frag;
+        }
+        return null; // throw error todo
+
     };
+
+    Rei.prototype.toArray = function(){
+        var raw = this.raw();
+        var arr;
+        if(raw.nodeType === 11){
+            arr = [];
+            for(var i = 0; i < raw.children.length; i++){
+                arr.push(raw[i]);
+            }
+        } else {
+            arr = [raw];
+        }
+        return arr;
+    };
+
 
     Rei.prototype.detect = catbus.$.detect;
 
+
     Rei.prototype.append = function(domish){
-        if(!this._solo)
-            throw new Error('cannot append to a multi-node fragment!');
-        var child = this._toContent(domish);
-        this._content.appendChild(child);
+
+        if(this._nodes.length !== 1)
+            throw new Error('cannot append to multiple nodes!');
+
+        var child = Rei(domish)._dom;
+        this[0].appendChild(child);
+
+        return this;
     };
 
     Rei.prototype.replaceWith = function(domish){
-        var newContent = this._toContent(domish);
-        var content = this._content;
+
+        var newContent = Rei(domish)._dom;
+        var content = this[0];
+
         content.parentNode.replaceChild(newContent, content);
+
     };
 
     Rei.prototype.focus = function(){
-        if(!this._solo)
-            throw new Error('cannot focus on a multi-node fragment!');
-        this._content.focus();
+        if(this._nodes.length !== 1)
+            throw new Error('cannot focus to multiple nodes!');
+        this[0].focus();
+        return this;
     };
 
     Rei.prototype.val = function(value){
         if(arguments.length === 0)
-            return this._content.value;
+            return this[0].value;
 
-        this._content.value = value;
+        this[0].value = value;
     };
 
     Rei.prototype.toggle = function(show, display){
-        if(arguments.length === 0)
-            throw new Error('toggle should always include an argument to avoid indeterminate display results');
         return show ? this.show(display) : this.hide();
     };
 
     Rei.prototype.show = function(display){
-        if(arguments.length === 0 && !this._memory.display)
-            throw new Error('toggle should include an argument to avoid indeterminate display results');
-        this._content.style.display = display || this._memory.display;
+        this[0].style.display = display || this._memory.display || 'block';
         return this;
     };
 
     Rei.prototype.hide = function(){
-        if(this._content.style.display === 'none')
+        if(this[0].style.display === 'none')
             return this;
 
-        this._memory.display =  this._content.style.display;
-        this._content.style.display = 'none';
+        this._memory.display =  this[0].style.display;
+        this[0].style.display = 'none';
+        return this;
     };
 
     Rei.prototype.vis = function(visibility){
-        this._content.style.visibility = visibility ? 'visible' : 'hidden';
+        this[0].style.visibility = visibility ? 'visible' : 'hidden';
+        return this;
     };
 
     Rei.prototype.text = function(text){
-        this._content.textContent = text;
+        if(arguments.length === 0)
+            return this[0].textContent;
+        this[0].textContent = text;
+        return this;
     };
 
+    Rei.prototype.first = function(){
+        return this[0];
+    };
+
+    Rei.prototype.last = function(){
+    };
+
+    Rei.prototype.html = function(html){
+        if(arguments.length === 0)
+            return this[0].innerHTML;
+        this[0].innerHTML = html;
+        return this;
+    };
+
+    Rei.prototype.empty = function(){
+        this[0].innerHTML = null;
+        return this;
+    };
+
+
     Rei.prototype.on = function(type, handler, useCapture){
-        this._content.addEventListener(type, handler, useCapture);
+        this[0].addEventListener(type, handler, useCapture);
+        return this;
     };
 
     Rei.prototype.off = function(type, handler, useCapture){
-        this._content.removeEventListener(type, handler, useCapture);
+        this[0].removeEventListener(type, handler, useCapture);
+        return this;
     };
 
     Rei.prototype.remove = function(){
-        var element = this._content;
-        if(element.parentNode){
-            element.parentNode.removeChild(element);
+        var nodes = this._nodes;
+        var count = nodes.length;
+        for(var i = 0; i < count; i++){
+            var node = nodes[i];
+            if(node.parentNode){
+                node.parentNode.removeChild(node);
+            }
         }
-        return element;
+
+        return this;
     };
 
-    Rei.prototype.toggleClass = function(){
-       var arg_array = [];
-        for(var i = 0; i < arguments.length; i++){
-            arg_array.push(arguments[i]);
+    Rei.prototype.toggleClass = function(nameOrNames, add){
+
+        if(!nameOrNames) return false;
+        var names = nameOrNames.split(' ');
+
+        for(var i = 0; i < names.length; i++){
+            var name = names[i];
+            if(name) {
+                if(arguments.length == 2)
+                    this._toggleClass(name, add);
+                else
+                    this._toggleClassImplicitly(name);
+            }
         }
-        var class_list = this._content.classList;
-        return class_list.toggle.apply(class_list, arg_array);
+
+
+        return this;
     };
 
-    Rei.prototype.addClass = function(names){
-        var arr = names.split(' ');
-        for(var i = 0; i < arr.length; i++){
-            this._addClass(arr[i]);
+    Rei.prototype._toggleClass = function(name, setting){
+
+        var class_list = this[0].classList;
+
+        if(setting)
+            class_list.add(name);
+        else
+            class_list.remove(name);
+
+        return this;
+
+    };
+
+    Rei.prototype._toggleClassImplicitly = function(name){ // this is a bad way to do things, just for jquery compatibility
+
+        var class_list = this[0].classList;
+
+        if(!class_list.contains(name)) {
+            class_list.add(name);
+        } else {
+            class_list.remove(name);
+        }
+
+        return this;
+    };
+
+
+
+    Rei.prototype.addClass = function(nameOrNames){
+        var names = nameOrNames.split(' ');
+        var class_list = this[0].classList;
+        for(var i = 0; i < names.length; i++){
+            var name = names[i];
+            if(name)
+                class_list.add(name);
         }
         return this;
     };
 
-    Rei.prototype._addClass = function(name){
-        var class_list = this._content.classList;
-        if(!class_list.contains(name))
-            class_list.add(name);
-    };
 
-    Rei.prototype.removeClass = function(names){
-        if(!names){
+    Rei.prototype.removeClass = function(nameOrNames){
+        if(!nameOrNames){
             this.removeAllClasses();
             return this;
         }
-        var arr = names.split(' ');
-        for(var i = 0; i < arr.length; i++){
-            this._removeClass(arr[i]);
+        var names = nameOrNames.split(' ');
+        var class_list = this[0].classList;
+        for(var i = 0; i < names.length; i++){
+            var name = names[i];
+            if(name)
+                class_list.remove(name);
         }
         return this;
     };
@@ -2726,23 +2874,23 @@
 
     Rei.prototype.removeAllClasses = function(){
         var arr = [];
-        var list = this._content.classList;
-        for(var i = 0; i < list.length; i++){
+        var i;
+        var list = this[0].classList;
+
+        for(i = 0; i < list.length; i++){
             arr.push(list.item(i));
         }
-        if(arr.length > 0)
-            this.removeClass(arr.join(' '));
+
+        for(i = 0; i < arr.length; i++){
+            this.removeClass(arr[i]);
+        }
+
         return this;
     };
 
-    Rei.prototype._removeClass = function(name){
-        var class_list = this._content.classList;
-        if(class_list.contains(name))
-            class_list.remove(name);
-    };
 
     Rei.prototype.prop = function(nameOrOptions, value){
-        var element = this._content;
+        var element = this[0];
         if(arguments.length === 0) return element;
         if(arguments.length === 2) {
             element[nameOrOptions] = value;
@@ -2751,39 +2899,47 @@
                 element[p] = nameOrOptions[p];
             }
         }
+        return this;
     };
 
 
     Rei.prototype.get = function(n){
-        return this._solo ? this._content : this._content.children[n];
+        return this._nodes[n];
     };
 
     Rei.prototype.css = function(nameOrOptions, value){
-        var style = this._content.style;
+        var style = this[0].style;
         if(arguments.length === 0) return style;
         if(arguments.length === 2) {
             style[nameOrOptions] = value + '';
         } else {
             if(typeof nameOrOptions === 'string')
-                return this._content.style[nameOrOptions];
+                return this[0].style[nameOrOptions];
             for(var p in nameOrOptions){
                 style[p] = nameOrOptions[p] + '';
             }
         }
+        return this;
     };
 
     Rei.prototype.attr = function(nameOrOptions, value){
-        var attributes = this._content.attributes;
+        var attributes = this[0].attributes;
         if(arguments.length === 0) return attributes;
         if(arguments.length === 2) {
-            this._content.setAttribute(nameOrOptions, value);
+            this[0].setAttribute(nameOrOptions, value);
         } else {
             if(typeof nameOrOptions === 'string')
-                return this._content.getAttribute(nameOrOptions);
+                return this[0].getAttribute(nameOrOptions);
             for(var p in nameOrOptions){
-                this._content.setAttribute(p, nameOrOptions[p]);
+                this[0].setAttribute(p, nameOrOptions[p]);
             }
         }
+        return this;
+    };
+
+    Rei.prototype.removeAttr = function(name){
+        this[0].removeAttribute(name);
+        return this;
     };
 
     var WebService = function() {
@@ -3091,4 +3247,4 @@
 
 
 
-})(jQuery);
+})(jQuery, window);

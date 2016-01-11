@@ -101,8 +101,8 @@
 
             noteChildren(cogRoot, treeRoot);
 
-            var viewerWidth = this.grueHolder.width();
-            var viewerHeight = this.grueHolder.height();
+            var viewerWidth = this.grueHolder.raw().clientWidth;
+            var viewerHeight = this.grueHolder.raw().clientHeight;
 
             var baseSvg = d3.select(this.svg[0]);
             var svgGroup = d3.select(this.g[0]);
