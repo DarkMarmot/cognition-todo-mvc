@@ -1,7 +1,7 @@
 ;(function($, window) {
 
     /**
-     * cognition.js (v1.4.0-rei replace jq)
+     * cognition.js (v1.5.1-rei replace jq)
      *
      * Copyright (c) 2015 Scott Southworth, Landon Barnickle, Nick Lorenson & Contributors
      *
@@ -66,20 +66,14 @@
 
     var defaultScriptDataPrototype = {
 
-        enter: function () {
-        },
-        update: function () {
-        },
-        exit: function () {
-            if (this.mapItem)
-                this.mapItem.destroy();
-        },
         init: function () {
         },
         start: function () {
         },
         destroy: function () {
-        }
+        },
+        index: null,
+        key: null
 
     };
 
@@ -115,10 +109,13 @@
     $.cog = function(scriptData){
         activeScriptData = scriptData;
         // add default methods to this nascent prototype if not present
-        $.each(defaultScriptDataPrototype, function(name, func){
-            if(typeof scriptData[name] !== 'function')
-                scriptData[name] = func;
-        });
+        if(!scriptData.init)
+            scriptData.init = defaultScriptDataPrototype.init;
+        if(!scriptData.start)
+            scriptData.start = defaultScriptDataPrototype.start;
+        if(!scriptData.destroy)
+            scriptData.destroy = defaultScriptDataPrototype.destroy;
+
     };
 
     cognition.init = function (node, url, debugUrl){
@@ -150,6 +147,13 @@
             destroyMapItem(mi);
         }
 
+        if(!mapItem.scriptData)
+            console.log("what?");
+
+
+        mapItem.scriptData.destroy();
+
+
         if(mapItem.parent){
             delete mapItem.parent.childMap[mapItem.uid];
         }
@@ -157,12 +161,6 @@
         bus.dropHost(mapItem.uid);
         mapItem.cogZone.drop();
 
-        if(!mapItem.scriptData)
-        {
-            console.log("what?");
-        }
-
-        mapItem.scriptData.destroy();
 
         if(mapItem.localSel)
             mapItem.localSel.remove();
@@ -831,8 +829,9 @@
         this.serviceMap = {};
         this.feedMap = {};
         this.aliasMap = {};
-        this.aliasProto = null; // alias map at creation, from parent.aliasFinal
-        this.aliasFinal = null; // alias map after local alias inclusion
+        this.aliasMap1 = null; // alias map provides alloy loading context
+        this.aliasMap2 = null; // alias map provides cog loading context
+        this.aliasMap3 = null; // alias map provides valve restricted context for children
         this.dataMap = {};
         this.valveMap = null;
         this.methodMap = {};
@@ -845,6 +844,7 @@
         this.requirementsSeen = {};
         this.itemData = null;
         this.itemKey = null;
+        this.itemDataLoc = null;
         this._declarationDefs = null;
 
         contentMap[this.uid] = this;
@@ -1079,12 +1079,12 @@
         mi.scriptData.mapItem = mi;
         self.childMap[mi.uid] = mi;
 
+        mi._cogAssignUrl(mi.url);
+
         mi.placeholder = getPlaceholderDiv(); // $('<div style="display: none;"></div>');
         self.targetNode.append(mi.placeholder);
 
-        if(self.itemType === DATA) {
-            mi.createData({name: name, value: data});
-        }
+        mi.itemDataLoc = mi.createData({name: name, value: data});
 
         mi._cogDownloadUrl(mi.url);
         return mi;
@@ -1122,7 +1122,7 @@
         if(mi.urlType !== 'data') {
 
             mi.url = this._resolveValueFromType(mi.url, mi.urlType);
-            //mi._cogAssignUrl(mi.url);
+            mi._cogAssignUrl(mi.url);
 
             if(!placeholder) {
 
@@ -1341,12 +1341,15 @@
     };
 
     MapItem.prototype._generateKeyMapForListDisplay = function(){
-        var keyMap = {};
 
-        $.each(this.childMap, function(i, mi){
+        var keyMap = {};
+        var childMap = this.childMap;
+        for(var id in childMap){
+            var mi = childMap[id];
             var itemKey = mi.itemKey;
             keyMap[itemKey] = mi;
-        });
+        }
+
         return keyMap;
     };
 
@@ -1360,19 +1363,9 @@
 
         var i;
 
-        //if(this.build === 'scratch')
-        //    destroyInnerMapItems(this);
-
         var remnantKeyMap = this._generateKeyMapForListDisplay();
         var dataKeyMap = {};
         var listItem;
-
-        var exiting = [];
-        var updating = [];
-        var entering = [];
-        var resulting;
-
-        var listItems = [];
 
         var itemDataName = this.item;
 
@@ -1383,59 +1376,29 @@
             listItem = remnantKeyMap[itemKey]; // grab existing item if key used before
 
             if(listItem) { // already exists
-                updating.push(listItem);
-                if(this.source) {
-                    var existingData = listItem.cogZone.findData(itemDataName);
-                    existingData.write(d);
-                }
+                listItem.itemDataLoc.write(d);
             } else {
                 listItem = this.createLink(url, itemDataName, d, i, itemKey);
-                entering.push(listItem);
             }
-
-
-            var isOdd = !!(i & 1);
-            listItem.localSel.toggleClass('odd',isOdd);
 
             dataKeyMap[itemKey] = listItem;
 
-            listItems.push(listItem);
-
         }
 
-        $.each(remnantKeyMap, function(oldKey, listItem){
+        for(var oldKey in remnantKeyMap){
+            listItem = remnantKeyMap[oldKey];
             if(!dataKeyMap[oldKey])
-                exiting.push(listItem);
-        });
-
-        resulting = [].concat(updating).concat(entering);
-
-        this._appendList(entering, resulting, exiting);
-
-    };
-
-
-    MapItem.prototype._appendList = function(entering, resulting, exiting){
-
-        $.each(entering, function(i, listItem){
-            listItem.scriptData.enter.call(listItem.scriptData);
-        });
-
-        $.each(resulting, function(i, listItem){
-            listItem.scriptData.update.call(listItem.scriptData);
-        });
-
-        $.each(exiting, function(i, listItem){
-            listItem.scriptData.exit.call(listItem.scriptData);
-        });
+                destroyMapItem(listItem);
+        }
 
 
     };
+
 
     function camelCase(str){
-            return str.replace( /-([a-z])/ig, function( all, letter ) {
-                return letter.toUpperCase();
-            } );
+        return str.replace( /-([a-z])/ig, function( all, letter ) {
+            return letter.toUpperCase();
+        } );
     }
 
     MapItem.prototype._cogBecomeUrl = function(){
@@ -1453,6 +1416,9 @@
         mi.scriptData.mapItem = mi;
 
         var scriptData = mi.scriptData;
+
+        scriptData.index = mi.itemOrder;
+        scriptData.key = mi.itemKey;
 
         if(mi.isAlloy)
             mi._cogInitialize();
@@ -1710,7 +1676,6 @@
     }
 
     function returnPlaceholderDiv(div){
-        div = (div.length) ? div[0] : div; // fix this with jquery removal
         div.remove();
         placeholderDivPool.push(div);
     }
@@ -1781,36 +1746,6 @@
     }
 
 
-    function clonedArrayOfChildNodes(node){
-
-        if(!node) return [];
-        var children = node.cloneNode(true).childNodes;
-        var i, n, result;
-        n = (i = children.length) - 1 >> 0;
-        result = new Array(i);
-        while (i--) {
-            result[n--] = children[i];
-        }
-        return result;
-
-    }
-
-    function clonedArrayOfNodeList(list){
-
-        if(!list) return [];
-        var i, n, result;
-        n = (i = list.length) - 1 >> 0;
-        result = new Array(i);
-        while (i--) {
-            result[n--] = list[i].cloneNode(true);
-        }
-        return result;
-
-    }
-
-
-
-
 
     function parseResponseHTML(response, url) {
 
@@ -1871,16 +1806,16 @@
     }
 
     MapItem.prototype._cogAssignUrl = function(url) {
-        var self = this;
-        self.url = url;
-        var resolvedUrl = self.resolvedUrl = self._resolveUrl(url);
-        self.path = self._determinePathFromFullUrl(resolvedUrl);
+        if(this.resolvedUrl)
+            throw(new Error('url was already resolved!'));
+        this.url = url;
+        this.resolvedUrl = this._resolveUrl(url);
+        this.path = this._determinePathFromFullUrl(this.resolvedUrl);
     };
 
-    MapItem.prototype._cogDownloadUrl = function (url) {
+    MapItem.prototype._cogDownloadUrl = function (){
 
         var self = this;
-        self._cogAssignUrl(url);
         var urlPlace = bus.location("n-url:"+ self.resolvedUrl);
         tryToDownload(self.resolvedUrl);
         urlPlace.on("done").as(self).host(self.uid).run(self._cogBecomeUrl).once().autorun();
