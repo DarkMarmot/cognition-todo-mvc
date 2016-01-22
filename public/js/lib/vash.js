@@ -2,6 +2,33 @@
 
     var Vash = {};
 
+    var plugins = typeof seele !== 'undefined' && seele;
+    if(plugins)
+        plugins.register('vash', Vash, true);
+    else
+        context.Vash = Vash; // bind to outer context
+
+    var activeScriptData = null; // set externally
+
+    // parsing results cached by resolvedUrl
+
+    var blueprintMap = {};
+    var displayMap = {};
+    var scriptMap = {};
+
+    var defaultScriptDataPrototype = {
+
+        init: function () {
+        },
+        start: function () {
+        },
+        destroy: function () {
+        },
+        index: null,
+        key: null
+
+    };
+
     // cognition data types
 
     var DATA = 'data';
@@ -28,6 +55,139 @@
 
     };
 
+
+    var rxhtmlTag = /<(?!area|br|col|embed|hr|img|input|link|meta|param)(([\w:]+)[^>]*)\/>/gi;
+
+
+    Vash.hasFile = function(url){
+        return blueprintMap.hasOwnProperty(url);
+    };
+
+    Vash.blueprint = function(url){
+        return blueprintMap[url];
+    };
+
+    Vash.script = function(url){
+
+        var script = scriptMap[url] || defaultScriptDataPrototype;
+        return Object.create(script);
+
+    };
+
+    Vash.display = function(url){
+        return displayMap[url];
+    };
+
+
+    function buildFragment(str) {
+
+        var elem, tmp, i,
+            fragment = document.createDocumentFragment(),
+            nodes = [];
+
+        tmp = fragment.appendChild(document.createElement("div"));
+
+        tmp.innerHTML = str.replace(rxhtmlTag, "<$1></$2>") ;
+
+        for(i = 0; i < tmp.childNodes.length; i++) {
+            nodes.push(tmp.childNodes[i]);
+        }
+
+        tmp = fragment.firstChild;
+        tmp.textContent = "";
+        fragment.textContent = "";
+
+        i = 0;
+        while ((elem = nodes[i++])) {
+            fragment.appendChild(elem);
+        }
+
+        return fragment;
+    }
+
+    function childNodesByName(node){
+
+        var result = {};
+        if(!node)
+            return result;
+
+        var children = node.childNodes;
+        var i = 0;
+        var n;
+
+        while((n = children[i++])){
+            var tag = n.localName;
+            var arr = result[tag] = result[tag] || [];
+            arr.push(n);
+        }
+
+        return result;
+    }
+
+    function unwrapDisplay(display){ //
+
+        if(!display) return null;
+        var fragment = document.createDocumentFragment();
+        var children = display.children;
+        while(children.length){
+            fragment.appendChild(children[0]);
+        }
+        return fragment;
+    }
+
+
+    Vash.parseFile = function(url, text){
+
+        var frag = buildFragment(text);
+
+        var blueSel = childNodesByName(frag.querySelector('blueprint'));
+        var scriptSel = frag.querySelector('script');
+        var htmlSel = unwrapDisplay(frag.querySelector('display'));
+
+        var scriptText= scriptSel && scriptSel.innerHTML;
+
+        if(scriptText) {
+            scriptText = wrapScript(scriptText, url);
+            try {
+                addScriptElement(scriptText);
+            } catch(err) {
+                console.log(err);
+            }
+        } else {
+            activeScriptData = activeScriptData || Object.create(defaultScriptDataPrototype);
+        }
+
+        if(!activeScriptData)
+            throw new Error("Script Data Failure:" + url);
+
+        scriptMap[url] = activeScriptData;
+        activeScriptData = null;
+
+        if(htmlSel && htmlSel.hasChildNodes())
+            displayMap[url] = htmlSel;
+
+        var blueprint = extractDeclarations(blueSel);
+        blueprintMap[url] = blueprint;
+
+    };
+
+    function wrapScript(scriptText, url) {
+        return scriptText + "\n//# sourceURL=http://cognition" + url + "";
+    }
+
+    function addScriptElement(scriptText) {
+
+        var scriptEle = document.createElement("script");
+        scriptEle.type = "text/javascript";
+        scriptEle.text = scriptText;
+        // todo add window.onerror global debug system for syntax errors in injected scripts?
+        document.head.appendChild(scriptEle);
+
+        scriptEle.parentNode.removeChild(scriptEle);
+
+    }
+
+
     function copyProps(source, target){
         source = source || {};
         target = target || {};
@@ -39,7 +199,20 @@
         return target;
     }
 
-    Vash.extractDeclarations = function(sel){
+    Vash.setScriptData = function(scriptData){
+
+        // add default methods to this nascent prototype if not present
+        if(!scriptData.init)
+            scriptData.init = defaultScriptDataPrototype.init;
+        if(!scriptData.start)
+            scriptData.start = defaultScriptDataPrototype.start;
+        if(!scriptData.destroy)
+            scriptData.destroy = defaultScriptDataPrototype.destroy;
+
+        activeScriptData = scriptData;
+    };
+
+    function extractDeclarations(sel){
 
         var decs = {};
 
@@ -95,7 +268,7 @@
         decs.requires = decs.requires.concat(getDefs2(sel.preload, extractPreloadDef2, true));
 
         return decs;
-    };
+    }
 
 
 
@@ -659,12 +832,5 @@
         }
         return undefined;
     }
-
-
-    var plugins = typeof seele !== 'undefined' && seele;
-    if(plugins)
-        plugins.register('vash', Vash, true);
-
-    context.Vash = Vash; // bind to outer context
 
 })(this);

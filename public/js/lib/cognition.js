@@ -1,7 +1,7 @@
 ;(function($, window) {
 
     /**
-     * cognition.js (v1.5.2-vash)
+     * cognition.js (v1.5.3-kakashi)
      *
      * Copyright (c) 2015 Scott Southworth, Landon Barnickle, Nick Lorenson & Contributors
      *
@@ -25,6 +25,8 @@
     var bus = cognition.plugins.monolith('catbus'); // functional data-bus
     var dom = cognition.plugins.monolith('rei'); // dom manipulation wrapper, jq-lite
     var parser = cognition.plugins.monolith('vash'); // turns blueprints into json
+    var resolver = cognition.plugins.monolith('kakashi'); // resolves aliases and urls in contexts
+    var downloader = cognition.plugins.monolith('ohmu'); // downloads batches of files
 
     var uid = 0;
 
@@ -52,30 +54,8 @@
         return cognition;
     };
 
-
-    var defaultScriptDataPrototype = {
-
-        init: function () {
-        },
-        start: function () {
-        },
-        destroy: function () {
-        },
-        index: null,
-        key: null
-
-    };
-
-    var activeScriptData = null;
-    var activeProcessURL = null;
-
     var contentMap = {}; // layout map, built from n-item hierarchy
-    var cacheMap = {}; // cache of content url loads
-    var declarationMap = {}; // arrays of strategy directives
-    var fileContextMap = {}; // alias context id + resolved url, true  when requirements done
     var libraryMap = {}; // by resolvedUrl, javascript files processed (don't run again)
-
-    var scriptMap = {}; // prototypes
 
 
     var webServiceDefaults = {
@@ -85,7 +65,6 @@
 
     };
 
-
     function destroyInnerMapItems(into){
         for(var k in into.childMap){
             var mi = into.childMap[k];
@@ -94,16 +73,13 @@
         }
     }
 
+    function wrapScript(scriptText, url) {
+        return scriptText + "\n//# sourceURL=http://cognition" + url + "";
+    }
 
     $.cog = function(scriptData){
-        activeScriptData = scriptData;
-        // add default methods to this nascent prototype if not present
-        if(!scriptData.init)
-            scriptData.init = defaultScriptDataPrototype.init;
-        if(!scriptData.start)
-            scriptData.start = defaultScriptDataPrototype.start;
-        if(!scriptData.destroy)
-            scriptData.destroy = defaultScriptDataPrototype.destroy;
+
+        parser.setScriptData(scriptData);
 
     };
 
@@ -123,6 +99,7 @@
         root.localSel = dom(node);
         root.targetNode = dom(node);
         root.isPinion = true;
+        root.aliasContext1 = root.aliasContext2 = root.aliasContext3 = resolver.resolveAliasContext(url);
         root.aliasMap3 = {id: ++uid, map: {}};
         root.createCog({url:url});
         if(debugUrl)
@@ -183,7 +160,7 @@
 
         this.path = null; // local directory
         this.localSel = null;
-        this.scriptData = Object.create(defaultScriptDataPrototype);
+        this.scriptData = parser.script();
         this.url = null; // possibly relative url requested
         this.resolvedUrl = null; // fully qualified and resolved url using path
         this.state = null;
@@ -220,33 +197,7 @@
         return contentMap[uid];
     };
 
-    MapItem.prototype.hash = function(arr, key, val){ // todo replace with _.indexBy for all files using it
-        var h = {};
 
-        if(typeof key === 'string') {
-            var keyField = key;
-            key = function (d) {
-                return d[keyField];
-            };
-        }
-        if(typeof val === 'undefined')
-            val = function(d){ return d;};
-        else if(typeof val === 'string') {
-            var valField = val;
-            val = function (d) {
-                return d[valField];
-            };
-        }
-
-        for(var i = 0; i < arr.length; i++){
-            var d = arr[i];
-            var k = key(d);
-            var v = val(d);
-            h[k] = v;
-        }
-
-        return h;
-    };
 
     // todo OUCH -- no underscore references should be here -- remove
     MapItem.prototype.createParams = function(parameterMap){
@@ -435,9 +386,64 @@
 
     };
 
-    function createAliasMapContext() {
-        var map = {id: ++uid, aliases: {}};
+    MapItem.prototype.createCog2 = function(def, placeholder){
+
+        var self = this;
+        var mi = new MapItem();
+
+        mi.cogZone = def.isRoute ? self.cogZone.demandChild(def.name, def.isRoute) : self.cogZone.demandChild(def.name);
+
+        mi.target = def.target;
+        mi.action = def.action || 'append';
+        mi.source = def.source;
+        mi.sourceType = def.sourceType || 'prop';
+        mi.item = def.item;
+        mi.itemType = def.itemType;
+        mi.name = def.name;
+        mi.url =  def.url;
+        mi.urlType = def.urlType || 'string';
+        mi.parent = self;
+
+        mi.scriptData.mapItem = mi;
+        self.childMap[mi.uid] = mi;
+
+        if(mi.urlType !== 'data') {
+
+            mi.url = self._resolveValueFromType(mi.url, mi.urlType);
+
+            mi.aliasContext1 = resolver.resolveAliasContext(mi.url, self.aliasContext3, def.aliases);
+            mi.resolvedUrl = mi.aliasContext1.resolveURL(mi.url);
+
+            if(!placeholder) {
+
+                mi.placeholder = getPlaceholderDiv();
+                mi.targetNode = (self.isPinion) ? self.targetNode : self.scriptData[mi.target];
+                mi.targetNode.append(mi.placeholder);
+
+            } else {
+
+                mi.placeholder = placeholder;
+
+            }
+
+            mi._cogDownloadUrl(mi.url);
+
+        } else {
+
+            mi.aliasContext = resolver.resolveAliasContext(mi.url, self.aliasContextFinal || self.aliasContext);
+            mi.isPinion = true;
+            mi.aliasContext1 = mi.aliasContext2 = mi.aliasContext3 = self.aliasContext3;
+            mi.targetNode = self.scriptData[mi.target];
+            mi.urlFromPlace = mi.cogZone.findData(mi.url).on('update').change().as(mi).host(mi.uid).run(mi._cogReplaceUrl2).autorun();
+
+        }
+
+        return mi;
+
     };
+
+
+
 
     MapItem.prototype.createCog = function(def, placeholder){
 
@@ -467,6 +473,7 @@
         if(mi.urlType !== 'data') {
 
             mi.url = self._resolveValueFromType(mi.url, mi.urlType);
+
             mi.resolvedUrl = mi._resolveUrl2(mi.url, mi.path, self.aliasMap3.map);
             mi.resolvedPath = mi.path = determinePathFromFullUrl(mi.resolvedUrl);
 
@@ -486,6 +493,7 @@
             mi._cogDownloadUrl(mi.url);
 
         } else {
+
 
             // todo make a createPinion function for clarity ???
             mi.isPinion = true;
@@ -536,6 +544,7 @@
         mi.targetNode = self.scriptData[mi.target];
 
         mi.aliasMap1 = mi.aliasMap2 = mi.aliasMap3 = self.aliasMap3;
+        mi.aliasContext = resolver.resolveAliasContext(mi.url, self.aliasContextFinal || self.aliasContext);
 
         var resolvedUrl = self._resolveUrl2(def.url, def.path, self.aliasMap1.map);
         var urlPlace = bus.location("n-url:"+resolvedUrl);
@@ -578,6 +587,7 @@
         self.cogZone.insertParent(alloy.cogZone);
 
         alloy.url = def.url;
+        alloy.aliasContext = resolver.resolveAliasContext(def.url, alloy.origin.aliasContextFinal);
         alloy.resolvedUrl = alloy._resolveUrl2(def.url, self.path, self.aliasMap1.map);
         alloy.resolvedPath = alloy.path = determinePathFromFullUrl(alloy.resolvedUrl);
 
@@ -760,15 +770,15 @@
         if(mi.destroyed || !mi.parent || mi.parent.destroyed) return;
 
         var url = mi.resolvedUrl;
-        var display = mi.display = cacheMap[url] && (cacheMap[url]).cloneNode(true);
-        mi._declarationDefs = declarationMap[url];
+        var display = mi.display = parser.display(url) && (parser.display(url)).cloneNode(true);
+        mi._declarationDefs = parser.blueprint(url);
 
-        var script = scriptMap[url] || defaultScriptDataPrototype;
-
-        var sd = mi.scriptData = Object.create(script);
+        var sd = mi.scriptData = parser.script(url);
         sd.mapItem = mi;
         sd.index = mi.itemOrder;
         sd.key = mi.itemKey;
+
+       // var contextParent = mi.parent.isAlloy ? mi.parent : alloy.origin;
 
         mi._cogAliasMap1();
 
@@ -792,6 +802,11 @@
     };
 
 
+    // cog first makes alloy loading context (using parent external context + aliases)
+    // child / active loading context same if no alloys, from last alloy otherwise
+    // external context -- applies valves
+
+    // alloy -- use origin's last alloy context (active loading context)
     // for alloys and libraries, (parent.aliasMap3 or origin.aliasMap1) + locally defined aliases
     MapItem.prototype._cogAliasMap1 = function(){
 
@@ -938,7 +953,7 @@
                 match = i;
                 req.ready = true;
                 if(endsWith(urlReady,".html")){
-                    var libs = declarationMap[urlReady].requires;
+                    var libs = parser.blueprint(urlReady).requires;
                     for(j = 0; j < libs.length; j++){
                         var def = libs[j];
                         def.path = def.path || determinePathFromFullUrl(urlReady);
@@ -1010,7 +1025,17 @@
     };
 
 
+    function addScriptElement(scriptText) {
 
+        var scriptEle = document.createElement("script");
+        scriptEle.type = "text/javascript";
+        scriptEle.text = scriptText;
+        // todo add window.onerror global debug system for syntax errors in injected scripts?
+        document.head.appendChild(scriptEle);
+
+        scriptEle.parentNode.removeChild(scriptEle);
+
+    }
 
     function createRequirement(requirementUrl, preload, fromUrl, name, isRoute, def){
         var urlPlace = bus.location("n-url:"+requirementUrl);
@@ -1072,7 +1097,7 @@
                 urlPlace.write(response);
 
                 if (isHTML)
-                    parseResponseHTML(response, url);
+                    parser.parseFile(url, response);
 
                 urlPlace.write({active: false, done: true}, "status");
                 urlPlace.write(url, "done");
@@ -1111,119 +1136,6 @@
         var tmp = fragment.appendChild(document.createElement("div"));
         tmp.innerHTML = '<div style="display: none;"></div>';
         return tmp.firstChild;
-    }
-
-    var rxhtmlTag = /<(?!area|br|col|embed|hr|img|input|link|meta|param)(([\w:]+)[^>]*)\/>/gi;
-
-    function buildFragment(str) {
-
-        var elem, tmp, i,
-            fragment = document.createDocumentFragment(),
-            nodes = [];
-
-        tmp = fragment.appendChild(document.createElement("div"));
-
-        tmp.innerHTML = str.replace(rxhtmlTag, "<$1></$2>") ;
-
-        for(i = 0; i < tmp.childNodes.length; i++) {
-            nodes.push(tmp.childNodes[i]);
-        }
-
-        tmp = fragment.firstChild;
-        tmp.textContent = "";
-        fragment.textContent = "";
-
-        i = 0;
-        while ((elem = nodes[i++])) {
-            fragment.appendChild(elem);
-        }
-
-        return fragment;
-    }
-
-    function childNodesByName(node){
-
-        var result = {};
-        if(!node)
-            return result;
-
-        var children = node.childNodes;
-        var i = 0;
-        var n;
-
-        while((n = children[i++])){
-            var tag = n.localName;
-            var arr = result[tag] = result[tag] || [];
-            arr.push(n);
-        }
-
-        return result;
-    }
-
-    function unwrapDisplay(display){ //
-
-        if(!display) return null;
-        var fragment = document.createDocumentFragment();
-        var children = display.children;
-        while(children.length){
-            fragment.appendChild(children[0]);
-        }
-        return fragment;
-    }
-
-
-
-    function parseResponseHTML(response, url) {
-
-
-        var frag = buildFragment(response);
-
-        activeProcessURL = url;
-
-        var blueSel = childNodesByName(frag.querySelector('blueprint'));
-        var scriptSel = frag.querySelector('script');
-        var htmlSel = unwrapDisplay(frag.querySelector('display'));
-
-        var scriptText= scriptSel && scriptSel.innerHTML;
-
-        if(scriptText) {
-            scriptText = wrapScript(scriptText, url);
-            try {
-                addScriptElement(scriptText);
-            } catch(err) {
-                console.log(err);
-            }
-        } else {
-            activeScriptData = activeScriptData || Object.create(defaultScriptDataPrototype);
-        }
-
-        if(!activeScriptData)
-            throw new Error("Script Data Failure:" + url);
-
-        if(htmlSel && htmlSel.hasChildNodes())
-            cacheMap[url] = htmlSel;
-        declarationMap[url] = parser.extractDeclarations(blueSel);
-
-        scriptMap[url] = activeScriptData;
-
-        activeScriptData = null;
-
-    }
-
-    function wrapScript(scriptText, url) {
-        return scriptText + "\n//# sourceURL=http://cognition" + url + "";
-    }
-
-    function addScriptElement(scriptText) {
-
-        var scriptEle = document.createElement("script");
-        scriptEle.type = "text/javascript";
-        scriptEle.text = scriptText;
-        // todo add window.onerror global debug system for syntax errors in injected scripts?
-        document.head.appendChild(scriptEle);
-
-        scriptEle.parentNode.removeChild(scriptEle);
-
     }
 
 

@@ -6,6 +6,7 @@
         return new Rei.prototype.init(domish);
     };
 
+    window.Rei = Rei;
 
     Rei.prototype.init = function(domish){
         this._memory = {};

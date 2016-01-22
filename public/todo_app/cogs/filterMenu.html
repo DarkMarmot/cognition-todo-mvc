@@ -1,14 +1,12 @@
 
 <blueprint>
 
-    <data name="meow" value="cat" />
-    <cog find="test" source="prop button" item="data button" url="buttons/filterButton.html" />
     <chain find="buttonList" source="prop buttons" item="data button" url="buttons/filterButton.html" />
+
 </blueprint>
 
 
 <display>
-    <div id="test" ></div>
     <ul id="buttonList" style="margin: 0; padding: 0; list-style: none;" ></ul>
 </display>
 
@@ -16,7 +14,6 @@
 <script>
     $.cog({
 
-        button: {title: 'Grr', value: 'cat', href: '#/', show: 'meow'},
         buttons:  [
             {title: 'All', value: 'noFilter', href: '#/', show: 'filter'},
             {title: 'Active', value: 'activeFilter', href: '#/active', show: 'filter'},
