@@ -1,5 +1,5 @@
 /**
- * catbus.js (v2.2.0)
+ * catbus.js (v2.2.1)
  *
  * Copyright (c) 2015 Scott Southworth, Landon Barnickle & Contributors
  *
@@ -1098,7 +1098,7 @@
             var s = sensors[i];
             var packet = s.peek();
             if(packet && packet.msg != undefined)
-                s.tell(packet.msg, packet.topic, packet.tag);
+                s.tell(packet.msg, packet.topic, packet.tag, true);
         }
 
         return this;
@@ -1174,7 +1174,7 @@
 
 
 
-    Sensor.prototype.tell = function(msg, topic, tag) {
+    Sensor.prototype.tell = function(msg, topic, tag, auto) {
 
         if(!this._active || this._dropped)
             return this;
@@ -1187,7 +1187,7 @@
         msg = (typeof this._appear === 'function') ? this._appear.call(this._context || this, msg, topic, tag) : msg;
 
         var compare_msg = this._change && this._change.call(null, msg, topic, tag);
-        if(this._change && compare_msg === this._lastAppearingMsg)
+        if(!auto && this._change && compare_msg === this._lastAppearingMsg)
             return this;
 
         this._lastAppearingMsg = compare_msg;
@@ -1629,6 +1629,10 @@
         return sensor;
 
     };
+
+    var plugins = typeof seele !== 'undefined' && seele;
+    if(plugins)
+        plugins.register('catbus', catbus, true);
 
     var selector = typeof jQuery !== 'undefined' && jQuery !== null ? jQuery : null;
     selector = selector || (typeof Zepto !== 'undefined' && Zepto !== null ? Zepto : null);

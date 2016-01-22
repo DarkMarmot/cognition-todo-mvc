@@ -1,7 +1,7 @@
 ;(function($, window) {
 
     /**
-     * cognition.js (v1.5.1-rei replace jq)
+     * cognition.js (v1.5.2-vash)
      *
      * Copyright (c) 2015 Scott Southworth, Landon Barnickle, Nick Lorenson & Contributors
      *
@@ -20,7 +20,12 @@
 
     "use strict";
     var cognition = $.cognition = {};
-    var bus = $.catbus = catbus;
+    cognition.plugins = typeof window.seele !== 'undefined' && window.seele;
+
+    var bus = cognition.plugins.monolith('catbus'); // functional data-bus
+    var dom = cognition.plugins.monolith('rei'); // dom manipulation wrapper, jq-lite
+    var parser = cognition.plugins.monolith('vash'); // turns blueprints into json
+
     var uid = 0;
 
     var COG_ROOT = bus.demandTree('COG_ROOT');
@@ -36,26 +41,10 @@
     var SERVICE = 'service';
     var STRING = 'string';
     var RUN = 'run';
-    var ERROR = 'error';
     var BOOLEAN = 'bool';
     var OBJECT = 'object';
     var READ = 'read';
 
-    // the value attribute of of a data tag can be preceded by one of these:
-    var DATA_VALUE_TYPE_HASH = {
-
-        data: DATA,
-        num: NUMBER,
-        number: NUMBER,
-        prop: PROP,
-        bool: BOOLEAN,
-        boolean: BOOLEAN,
-        string: STRING,
-        run: RUN,
-        error: ERROR,
-        read: READ
-
-    };
 
     cognition.buildNum = function(n){
         if(arguments.length == 0) return buildNum;
@@ -131,9 +120,10 @@
         if(directions)
             COG_ROOT.demandData('__DIRECTIONS__').write(directions);
 
-        root.localSel = Rei(node);
-        root.targetNode = Rei(node);
+        root.localSel = dom(node);
+        root.targetNode = dom(node);
         root.isPinion = true;
+        root.aliasMap3 = {id: ++uid, map: {}};
         root.createCog({url:url});
         if(debugUrl)
             root.createCog({url: debugUrl});
@@ -180,631 +170,6 @@
 
     }
 
-
-
-    function extractHasAttr2(node, attrName){
-        return !!(node && node.attributes.getNamedItem(attrName));
-    }
-
-
-    function extractString2(node, attrNameOrNames, defaultValue){
-
-        var attrValue = determineFirstDefinedAttrValue2(node, attrNameOrNames);
-        if(attrValue)
-            return attrValue.trim();
-        return defaultValue;
-
-    }
-
-
-    function extractBool2(node, attrNameOrNames, defaultValue){
-
-        var attrValue = determineFirstDefinedAttrValue2(node, attrNameOrNames);
-
-        if(attrValue === undefined)
-            return defaultValue;
-        if(attrValue === 'true')
-            return true;
-        if(attrValue === 'false')
-            return false;
-
-        throwParseError(node, 'bool', attrNameOrNames);
-
-    }
-
-
-
-    function extractStringArray2(node, attrNameOrNames){
-
-        var attrValue = determineFirstDefinedAttrValue2(node, attrNameOrNames);
-        if(attrValue)
-            return stringToStringArray(attrValue);
-        return [];
-
-    }
-
-    function stringToStringArray(str){
-
-        var arr = str.split(',');
-
-        for(var i = arr.length - 1; i >= 0; i--){
-            var chunk = arr[i];
-            var trimmed_chunk = chunk.trim();
-            if(!trimmed_chunk)
-                arr.splice(i, 1);
-            else if(trimmed_chunk.length !== chunk.length)
-                arr.splice(i, 1, trimmed_chunk);
-        }
-
-        return arr;
-
-    }
-
-
-    function determineFirstDefinedAttrValue2(node, attrNameOrNames){
-
-        var arr = stringToStringArray(attrNameOrNames);
-        var atts = node.attributes;
-        for(var i = 0; i < arr.length; i++){
-            var att = atts.getNamedItem(arr[i]);
-            if(att)
-                return att.value;
-        }
-        return undefined;
-    }
-
-
-
-    function extractCommandDef2(node){
-
-        var d = {
-
-            name: extractString2(node, 'name'),
-            pipe: extractString2(node, 'pipe'),
-            toggle: extractString2(node, 'toggle'),
-            filter: extractString2(node, 'filter'),
-            topic: extractString2(node, 'on', 'update'),
-            run: extractString2(node, 'run'),
-            emit: extractString2(node, 'emit'),
-            emitPresent: extractHasAttr2(node, 'emit'),
-            emitType: null,
-            once: extractBool2(node, 'once'),
-            change: extractBool2(node, 'change', false),
-            extract: extractString2(node, 'extract'),
-            transform: extractString2(node, 'transform'),
-            transformPresent: extractHasAttr2(node, 'transform'),
-            transformType: null,
-            adapt: extractString2(node, 'adapt'),
-            adaptPresent: extractHasAttr2(node, 'adapt'),
-            adaptType: null,
-            autorun: false,
-            batch: extractBool2(node, 'batch'),
-            keep: 'last', // first, all, or last
-            need: extractStringArray2(node, 'need'),
-            gather: extractStringArray2(node, 'gather'),
-            defer: extractBool2(node, 'defer')
-
-        };
-
-        d.watch = [d.name];
-
-        // gather needs and cmd -- only trigger on cmd
-        if(d.gather.length || d.need.length) {
-            d.gather.push(d.name);
-
-            for (var i = 0; i < d.need.length; i++) {
-                var need = d.need[i];
-                if (d.gather.indexOf(need) === -1)
-                    d.gather.push(need);
-            }
-        }
-
-        d.batch = d.batch || d.run;
-        d.group = d.batch; // todo make new things to avoid grouping and batching with positive statements
-        d.retain = d.group;
-
-        applyFieldType(d, 'transform', PROP);
-        applyFieldType(d, 'emit', STRING);
-        applyFieldType(d, 'adapt', PROP);
-
-        return d;
-
-    }
-
-
-    function extractSensorDef2(node){
-
-        var d = {
-
-            name: extractString2(node, 'data'),
-            cmd: extractString2(node, 'cmd'),
-            watch: extractStringArray2(node, 'watch'),
-            detect: extractString2(node, 'detect'),
-            data: extractString2(node, 'data'),
-            find: extractString2(node, 'id,find,node'), // todo switch all to id
-            optional: extractBool2(node, 'optional'),
-            where: extractString2(node, 'from,where', 'first'),
-            pipeWhere: extractString2(node, 'to', 'first'),
-            thing: extractString2(node, 'is', 'data'), // data, feed, service
-            pipe: extractString2(node, 'pipe'),
-            toggle: extractString2(node, 'toggle'),
-            demand: extractString2(node, 'demand'),
-            filter: extractString2(node, 'filter'),
-            topic: extractString2(node, 'for,on,topic', 'update'),
-            run: extractString2(node, 'run'),
-            emit: extractString2(node, 'emit'),
-            emitPresent: extractHasAttr2(node, 'emit'),
-            emitType: null,
-            once: extractBool2(node, 'once'),
-            retain: extractBool2(node, 'retain'), // opposite of forget, now the default
-            forget: extractBool2(node, 'forget'), // doesn't retain group hash values from prior flush events
-            fresh: extractBool2(node, 'fresh'), // send only fresh, new values (does not autorun with preexisting data)
-            separate: extractBool2(node, 'separate'), // turns off automatic batching and grouping
-            group: extractBool2(node, 'group'),
-            change: extractBool2(node, 'change,distinct,skipDupes', false),
-            extract: extractString2(node, 'extract'),
-            transform: extractString2(node, 'transform'),
-            transformPresent: extractHasAttr2(node, 'transform'),
-            transformType: null,
-            adapt: extractString2(node, 'adapt'),
-            adaptPresent: extractHasAttr2(node, 'adapt'),
-            adaptType: null,
-            autorun: extractBool2(node, 'now,auto,autorun'),
-            batch: extractBool2(node, 'batch'),
-            keep: extractString2(node, 'keep', 'last'), // first, all, or last
-            need: extractStringArray2(node, 'need,needs'),
-            gather: extractStringArray2(node, 'gather'),
-            defer: extractBool2(node, 'defer')
-
-        };
-
-        var i;
-
-        // add needs to the watch
-        for(i = 0; i < d.need.length; i++){
-            var need = d.need[i];
-            if(d.watch.indexOf(need) === -1)
-                d.watch.push(need);
-        }
-
-        // add cmd to the watch list
-        if(d.cmd && d.watch.indexOf(d.cmd) === -1)
-            d.watch.push(d.cmd);
-
-        // add watches to the gathering -- if gathering
-        if(d.gather.length > 0) {
-            for (i = 0; i < d.watch.length; i++) {
-                var watch = d.watch[i];
-                if (d.gather.indexOf(watch) === -1)
-                    d.gather.push(watch);
-            }
-        }
-
-        if(!d.find && !d.cmd && !d.fresh) // && d.watch.length > 0)
-            d.autorun = true;
-
-        d.batch = !d.separate && (d.batch || (d.watch.length > 1));
-        d.group = d.batch; // todo make new things to avoid grouping and batching with positive statements
-        d.retain = d.group;
-
-        applyFieldType(d, 'transform', PROP);
-        applyFieldType(d, 'emit', STRING);
-        applyFieldType(d, 'adapt', PROP);
-
-        return d;
-
-    }
-
-
-    function extractPropDef2(node){
-
-        var d = {
-            find: extractString2(node, 'find'),
-            thing: extractString2(node, 'is', 'data'),
-            where: extractString2(node, 'where', 'first'),
-            optional: extractBool2(node, 'optional'),
-            name: extractString2(node, 'name')
-        };
-
-        d.name = d.name || d.find;
-        return d;
-
-    }
-
-
-    function extractWriteDef2(node){
-        return {
-            name: extractString2(node, 'name'),
-            thing: extractString2(node, 'is', 'data'),
-            where: extractString2(node, 'where', 'first'),
-            value: extractString2(node, 'value')
-        };
-    }
-
-
-    function extractAdapterDef2(node){
-
-        var d =  {
-            name: extractString2(node, 'name'),
-            control: extractBool2(node, 'control'),
-            optional: extractBool2(node, 'optional'),
-            field: extractString2(node, 'field'),
-            fieldType: null,
-            item: extractString2(node, 'item')
-            // todo -- add dynamic adapter that rewires?
-        };
-
-        d.name = d.name || d.field;
-        d.field = d.field || d.name;
-
-        applyFieldType(d, 'field', STRING);
-
-
-        return d;
-    }
-
-
-    function extractValveDef2(node){
-        return {
-            allow: extractStringArray2(node, 'allow'),
-            thing: extractString2(sel, 'is', 'data')
-        };
-    }
-
-    function extractLibraryDef2(node){
-        return {
-            name: null,
-            url: extractStringArray2(node, 'url'),
-            path: extractString2(node, 'path'),
-            isRoute: false,
-            isAlloy: false,
-            isLibrary: true,
-            isPreload: false,
-            preload: false
-        };
-    }
-
-
-    function extractPreloadDef2(node){
-        return {
-            name: null,
-            url: extractStringArray2(node, 'url'),
-            path: extractString2(node, 'path'),
-            isRoute: false,
-            isAlloy: false,
-            isLibrary: false,
-            isPreload: true,
-            preload: true
-        };
-    }
-
-
-    function extractAlloyDef2(node){
-
-        var d = {
-            url: extractString2(node, 'url'),
-            path: extractString2(node, 'path'),
-            name: extractString2(node, 'name'),
-            isRoute: extractBool2(node, 'route'),
-            source: extractString2(node, 'source'),
-            item: extractString2(node, 'item','itemData'),
-            isAlloy: true,
-            isLibrary: false,
-            isPreload: false,
-            preload: false
-        };
-
-        applyFieldType(d,'source', DATA);
-        applyFieldType(d,'item', DATA);
-
-        return d;
-    }
-
-
-
-    function extractServiceDef2(node){
-
-        var d = {
-            name: extractString2(node, 'name'),
-            to: extractString2(node, 'to'),
-            url: extractString2(node, 'url'),
-            path: extractString2(node, 'path'),
-            topic: extractString2(node, 'on,topic'),
-            run: extractString2(node, 'run'),
-            post: extractBool2(node, 'post'),
-            format: extractString2(node, 'format', 'jsonp'),
-            request: extractBool2(node, 'req,request'),
-            prop: extractBool2(node, 'prop')
-        };
-
-
-        return d;
-
-    }
-
-
-    function extractDefaultFeedDefFromServiceDef(def){
-        return {
-            name: def.name,
-            to: def.to,
-            service: def.name
-        };
-    }
-
-    function extractCogDef2(node){
-
-        var d = {
-
-            path: extractString2(node, "path"),
-            name: extractString2(node, "name"),
-            isRoute: extractBool2(node, "route"),
-            url: extractString2(node, "url"),
-            source: extractString2(node, 'use') || extractString2(node, 'from,source'),
-            item: extractString2(node, 'make') || extractString2(node, 'to,item','cog'),
-            target: extractString2(node, "id,find"),
-            action: extractString2(node, "and", 'append')
-
-        };
-
-        applyFieldType(d,'url');
-        applyFieldType(d,'source', DATA);
-        applyFieldType(d,'item', DATA);
-
-        return d;
-
-    }
-
-    function extractChainDef2(node){
-
-        var d = {
-            path: extractString2(node, "path"),
-            name: extractString2(node, "name"),
-            isRoute: extractBool2(node, "route"),
-            url: extractString2(node, "url"),
-            prop: extractBool2(node, 'prop'),
-            source: extractString2(node, "from,source"),
-            item: extractString2(node, "to,value,item",'cog'),
-            key: extractString2(node, "key"),
-            build: extractString2(node, 'build', 'append'), // scratch, append, sort
-            order: extractBool2(node, 'order'), // will use flex order css
-            depth: extractBool2(node, 'depth'), // will use z-index
-            target: extractString2(node, "node,id,find")
-
-        };
-
-        applyFieldType(d, 'source', DATA);
-        applyFieldType(d, 'item', DATA);
-
-        return d;
-
-    }
-
-
-
-    function extractFeedDef2(node){
-
-        var d = {
-            service: extractString2(node, 'service'),
-            to: extractString2(node, 'to,data'), // todo decide on to or data
-            request: extractBool2(node, 'req,request'),// todo change to extractBool and test
-            name: extractString2(node, 'name', false),
-            prop: extractBool2(node, 'prop', false)
-        };
-
-        d.name = d.name || d.service;
-
-        return d;
-
-    }
-
-
-    function extractDataDef2(node){
-
-        var d = {
-            name: extractString2(node, 'name'),
-            inherit: extractBool2(node, 'inherit'),
-            isRoute: extractBool2(node, 'route'),
-            value: extractString2(node, 'value'),
-            valuePresent: extractHasAttr2(node, 'value'),
-            valueType: null,
-            adapt: extractString2(node, 'adapt'),
-            adaptType: null,
-            adaptPresent: extractHasAttr2(node, 'adapt'),
-            service: extractString2(node, 'service'),
-            serviceType: null,
-            servicePresent: extractHasAttr2(node, 'service'),
-            params: extractString2(node, 'params'),
-            paramsType: null,
-            paramsPresent: extractHasAttr2(node, 'params'),
-            url: extractString2(node, 'url'),
-            path: extractString2(node, 'path'),
-            verb: extractString2(node, 'verb'),
-            prop: extractBool2(node, 'prop'),
-            request: extractBool2(node, 'req,request', false) // todo support data loc sensored, if object then acts as params in request
-        };
-
-        applyFieldType(d, 'value');
-        applyFieldType(d, 'params', PROP);
-        applyFieldType(d, 'service');
-        applyFieldType(d, 'adapt', PROP);
-
-        return d;
-
-    }
-
-
-    function extractNetDef2(node){
-
-        var d = {
-            name: extractString2(node, 'name'),
-            inherit: extractBool2(node, 'inherit'),
-            isRoute: extractBool2(node, 'route'),
-            value: extractString2(node, 'value'),
-            valuePresent: extractHasAttr2(node, 'value'),
-            valueType: null,
-            adapt: extractString2(node, 'adapt'),
-            adaptType: null,
-            adaptPresent: extractHasAttr2(node, 'adapt'),
-            service: extractString2(node, 'service'),
-            serviceType: null,
-            servicePresent: extractHasAttr2(node, 'service'),
-            params: extractString2(node, 'params'),
-            paramsType: null,
-            paramsPresent: extractHasAttr2(node, 'params'),
-            url: extractString2(node, 'url'),
-            path: extractString2(node, 'path'),
-            verb: extractString2(node, 'verb'),
-            prop: extractBool2(node, 'prop'),
-            request: extractBool2(node, 'req,request', false) // todo support data loc sensored, if object then acts as params in request
-        };
-
-        applyFieldType(d, 'value');
-        applyFieldType(d, 'params', PROP);
-        applyFieldType(d, 'service');
-        applyFieldType(d, 'adapt', PROP);
-
-        return d;
-
-    }
-
-    function stringToSimpleValue(str){
-
-        if(str === 'true'){
-            return true;
-        } else if(str === 'false'){
-            return false;
-        } else if(str === 'null'){
-            return null;
-        } else if(str === '[]'){
-            return [];
-        } else if(str === '{}'){
-            return {};
-        } else {
-            return str;
-        }
-
-    }
-
-    function stringToPrimitive(str, type) {
-
-        if(type === BOOLEAN) {
-            return (str === 'true');
-        } else if (type === NUMBER) {
-            return Number(str);
-        } else {
-            return str;
-        }
-    }
-
-    function applyFieldType(d, fieldName, defaultType){
-
-        var str = d[fieldName];
-        if(str === undefined) // field was not defined, don't need to assign a type
-            return;
-
-        var fieldTypeName = fieldName + "Type";
-        var chunks = str.split(" ");
-
-        var typeDeclared = chunks.length > 0 && DATA_VALUE_TYPE_HASH[chunks[0]];
-        var type = typeDeclared || defaultType;
-
-        d[fieldTypeName] = type;
-
-        if(chunks.length === 1) { // no prefix for data type given, implicitly coerce to bool or null if appropriate
-            d[fieldName] = (type) ? str : stringToSimpleValue(str);
-        } else {
-            if(typeDeclared) // check to avoid removing part of a string with spaces that didn't specify a type
-                chunks.shift();
-            str = chunks.join(' ');
-            d[fieldName] = stringToPrimitive(str, type);
-        }
-
-    }
-
-
-    function extractAliasDef2(node){
-
-        return {
-            name: extractString2(node, 'name'),
-            path: extractString2(node, 'path'),
-            url: extractString2(node, 'url'),
-            prop: extractBool2(node, 'prop')
-        };
-
-    }
-
-
-    function extractMethodDef2(node){
-
-        var d = {
-            name: extractString2(node, 'name'),
-            func: extractString2(node, 'func'),
-            bound: extractBool2(node, 'bound')
-        };
-
-        d.name = d.name || d.func;
-        d.func = d.func || d.name;
-
-        return d;
-    }
-
-    function extractDeclarations(sel){
-
-        var decs = {};
-
-        function getDefs2(source, extractor, multiName){
-
-            var result = [];
-
-            if(!source)
-                return result;
-
-            for(var i = 0; i < source.length; i++){
-                var node = source[i];
-                var def = extractor(node);
-                if(multiName) {
-                    for(var j = 0; j < def.url.length; j++){
-                        var def2 = copyProps(def, {});
-                        def2.url = def.url[j];
-                        result.push(def2);
-                    }
-                } else {
-                    result.push(def);
-                }
-            }
-
-            return result;
-        }
-
-        decs.aliases = [].concat(getDefs2(sel.alias, extractAliasDef2));
-        decs.adapters = [].concat(getDefs2(sel.adapter, extractAdapterDef2));
-        decs.valves = [].concat(getDefs2(sel.valve, extractValveDef2));
-        decs.dataSources = [].concat(getDefs2(sel.data, extractDataDef2));
-        decs.dataSources = decs.dataSources.concat(getDefs2(sel.net, extractNetDef2));
-        decs.services = [].concat(getDefs2(sel.service, extractServiceDef2));
-        decs.feeds = [].concat(getDefs2(sel.feed, extractFeedDef2));
-        decs.methods = [].concat(getDefs2(sel.method, extractMethodDef2));
-        decs.properties = [].concat(getDefs2(sel.prop, extractPropDef2));
-        decs.sensors = [].concat(getDefs2(sel.sensor, extractSensorDef2));
-        var commandDefs = getDefs2(sel.command, extractCommandDef2);
-        decs.sensors = decs.sensors.concat(commandDefs);
-
-        decs.commands = [];
-        for(var i = 0; i < commandDefs.length; i++){
-            var def = commandDefs[i];
-            decs.commands.push(def.name);
-        }
-
-        decs.writes = [].concat(getDefs2(sel.write, extractWriteDef2));
-        decs.cogs = [].concat(getDefs2(sel.cog, extractCogDef2));
-        decs.chains = [].concat(getDefs2(sel.chain, extractChainDef2));
-        decs.requires = [].concat(getDefs2(sel.require, extractLibraryDef2, true));
-        decs.requires = decs.requires.concat(getDefs2(sel.hoist, extractAlloyDef2));
-        decs.requires = decs.requires.concat(getDefs2(sel.alloy, extractAlloyDef2));
-        decs.requires = decs.requires.concat(getDefs2(sel.preload, extractPreloadDef2, true));
-
-        return decs;
-    }
 
 
     var MapItem = function() {
@@ -925,15 +290,6 @@
         return url;
     }
 
-    // take full url and get directory
-    MapItem.prototype._determinePathFromFullUrl = function(url){
-        var lastSlashPos = url.lastIndexOf("/");
-        if(lastSlashPos === 0)
-            return "/";
-        if(lastSlashPos < url.length - 1 && lastSlashPos > 0)
-            url = url.substring(0,lastSlashPos + 1);
-        return url;
-    };
 
     function copyProps(source, target){
         source = source || {};
@@ -1011,21 +367,6 @@
 
     };
 
-    MapItem.prototype._cogApplyAliases = function(){
-        var localAliases = this._declarationDefs.aliases;
-        //var localValves = this._declarationDefs.valves;
-        if(localAliases.length === 0){//} && localValves.length === 0){
-            this.aliasFinal = this.aliasProto; // no changes
-            return;
-        }
-
-        var final = {};
-        var proto = this.aliasProto.aliases;
-        for(var p in proto){
-            final[p] = proto[p];
-        }
-
-    };
 
     MapItem.prototype._cogBuildDeclarations = function(){
 
@@ -1059,7 +400,8 @@
 
         self.scriptData.start();
 
-        self._declarationDefs = null;
+        //self._declarationDefs = null;
+
 
     };
 
@@ -1079,7 +421,9 @@
         mi.scriptData.mapItem = mi;
         self.childMap[mi.uid] = mi;
 
-        mi._cogAssignUrl(mi.url);
+
+        mi.resolvedUrl = mi._resolveUrl2(url, self.path, self.aliasMap3.map);
+        mi.resolvedPath = mi.path = determinePathFromFullUrl(mi.resolvedUrl);
 
         mi.placeholder = getPlaceholderDiv(); // $('<div style="display: none;"></div>');
         self.targetNode.append(mi.placeholder);
@@ -1113,7 +457,8 @@
         mi.urlType = def.urlType || 'string'; // s = string, d = data, p = prop
 
 
-        mi.path = (def.path) ? self._resolvePath(def.path) : null;
+        //mi.path = (def.path) ? self._resolvePath(def.path) : null;
+        mi.path = (def.path) ? self._resolvePath2(def.path, self.aliasMap3.map) : self.path;
         mi.parent = self;
 
         mi.scriptData.mapItem = mi;
@@ -1121,8 +466,9 @@
 
         if(mi.urlType !== 'data') {
 
-            mi.url = this._resolveValueFromType(mi.url, mi.urlType);
-            mi._cogAssignUrl(mi.url);
+            mi.url = self._resolveValueFromType(mi.url, mi.urlType);
+            mi.resolvedUrl = mi._resolveUrl2(mi.url, mi.path, self.aliasMap3.map);
+            mi.resolvedPath = mi.path = determinePathFromFullUrl(mi.resolvedUrl);
 
             if(!placeholder) {
 
@@ -1132,7 +478,7 @@
                     // was: mi.targetNode = (mi.target) ? self.scriptData[mi.target] : self.localSel.last();
                 }
                 mi.targetNode = (self.isPinion) ? self.targetNode : (
-                    (mi.target) ? self.scriptData[mi.target] : Rei(self.localSel.last()[0]));
+                    (mi.target) ? self.scriptData[mi.target] : dom(self.localSel.last()[0]));
                 mi.targetNode.append(mi.placeholder);  //[mi.action](mi.placeholder);
             } else {
                 mi.placeholder = placeholder;
@@ -1150,7 +496,9 @@
                 // was: mi.targetNode = (mi.target) ? self.scriptData[mi.target] : self.localSel.last();
             }
 
-            mi.aliasFinal = mi.aliasProto;
+            mi.aliasMap1 = mi.aliasMap2 = mi.aliasMap3 = self.aliasMap3;
+            mi.path = self.path;
+
             mi.targetNode = self.scriptData[mi.target];
             mi.urlFromPlace = mi.cogZone.findData(mi.url).on('update').change().as(mi).host(mi.uid).run(mi._cogReplaceUrl).autorun();
 
@@ -1179,7 +527,7 @@
         mi.name = def.name;
         mi.listKey = def.key;
         mi.url =  def.url;
-        mi.path = (def.path) ? self._resolvePath(def.path) : null;
+        mi.path = (def.path) ? self._resolvePath(def.path) : self.path;
         mi.parent = self;
         mi.aliasProto = mi.aliasFinal = self.aliasFinal; // new aliases can't be defined in a chain
         mi.scriptData.mapItem = mi;
@@ -1187,7 +535,9 @@
 
         mi.targetNode = self.scriptData[mi.target];
 
-        var resolvedUrl = this._resolveUrl(def.url, def.path);
+        mi.aliasMap1 = mi.aliasMap2 = mi.aliasMap3 = self.aliasMap3;
+
+        var resolvedUrl = self._resolveUrl2(def.url, def.path, self.aliasMap1.map);
         var urlPlace = bus.location("n-url:"+resolvedUrl);
         tryToDownload(resolvedUrl);
         urlPlace.on("done").as(mi).host(mi.uid).run(mi._seekListSource).once().autorun();
@@ -1227,7 +577,10 @@
 
         self.cogZone.insertParent(alloy.cogZone);
 
-        alloy._cogAssignUrl(def.url);
+        alloy.url = def.url;
+        alloy.resolvedUrl = alloy._resolveUrl2(def.url, self.path, self.aliasMap1.map);
+        alloy.resolvedPath = alloy.path = determinePathFromFullUrl(alloy.resolvedUrl);
+
         alloy._cogBecomeUrl();
 
     };
@@ -1412,32 +765,101 @@
 
         var script = scriptMap[url] || defaultScriptDataPrototype;
 
-        mi.scriptData = Object.create(script);
-        mi.scriptData.mapItem = mi;
+        var sd = mi.scriptData = Object.create(script);
+        sd.mapItem = mi;
+        sd.index = mi.itemOrder;
+        sd.key = mi.itemKey;
 
-        var scriptData = mi.scriptData;
+        mi._cogAliasMap1();
 
-        scriptData.index = mi.itemOrder;
-        scriptData.key = mi.itemKey;
-
-        if(mi.isAlloy)
+        if(mi.isAlloy) {
             mi._cogInitialize();
-        else {
+        } else {
+
 
             var nodes = display.querySelectorAll('[id]');
             for(var i = 0; i < nodes.length; i++){
                 var node = nodes[i];
                 var cameCaseName = camelCase(node.id);
-                scriptData[cameCaseName] = Rei(node);
+                sd[cameCaseName] = dom(node);
                 node.setAttribute('id', mi.uid + '_' + cameCaseName);
             }
 
-            mi.localSel = Rei(display); //$(mi.display.childNodes); //$(clonedArrayOfNodeList(htmlSel));  //htmlSel.clone();
+            mi.localSel = dom(display);
             mi._cogRequestRequirements();
         }
 
     };
 
+
+    // for alloys and libraries, (parent.aliasMap3 or origin.aliasMap1) + locally defined aliases
+    MapItem.prototype._cogAliasMap1 = function(){
+
+        var baseAliasMap = (this.isAlloy ? this.origin.aliasMap1 : this.parent.aliasMap3) || {id: ++uid, map: {}};
+
+        var aliasDefs = this._declarationDefs.aliases;
+        if(aliasDefs.length === 0){
+            this.aliasMap1 = baseAliasMap;
+            return;
+        }
+
+        var newAliasMap = {id: ++uid, map: {}};
+
+        copyProps(baseAliasMap.map, newAliasMap.map);
+        for(var i = 0; i < aliasDefs.length; i++){
+            var def = aliasDefs[i];
+            var url = this._resolveUrl2(def.url, def.path, newAliasMap.map);
+            newAliasMap.map[def.name] = url;
+        }
+
+        //console.log('ALIAS_MAP:'+this.resolvedUrl, newAliasMap);
+        this.aliasMap1 = newAliasMap;
+    };
+
+
+    // for loading child cogs, local.aliasMap1 + merged aliases of alloys
+    MapItem.prototype._cogAliasMap2 = function(){
+
+        if(this.isAlloy || this.isPinion || this.isChain) {
+            this.aliasMap2 = this.aliasMap3 = this.aliasMap1;
+            return;
+        }
+
+        var baseAliasMap = this.aliasMap1;
+        var alloys = this.alloys;
+        var alloy = null;
+        var newAliasMap = null;
+
+        for(var i = 0; i < alloys.length; i++){
+
+            alloy = alloys[i];
+            var aliasDefs = alloy._declarationDefs.aliases;
+
+            if(aliasDefs.length !== 0){
+
+                if(!newAliasMap) {
+                    newAliasMap = {id: ++uid, map: {}};
+                    copyProps(baseAliasMap.map, newAliasMap.map);
+                }
+
+                for(var j = 0; j < aliasDefs.length; j++){
+                    var def = aliasDefs[j];
+                    var url = this._resolveUrl2(def.url, def.path, newAliasMap.map);
+                    newAliasMap.map[def.name] = url;
+                }
+
+            }
+        }
+
+        newAliasMap = newAliasMap || baseAliasMap;
+        this.aliasMap2 = this.aliasMap3 = newAliasMap;
+
+    };
+
+    // within child cogs, local.aliasMap2 + local valves to restrict access upwards
+    MapItem.prototype._cogAliasMap3 = function(){
+
+    };
 
 
     MapItem.prototype._cogReplaceUrl = function(url){
@@ -1455,10 +877,12 @@
         var self = this;
 
         var libs = self._declarationDefs.requires;
-        libs.forEach(function (def) {
-            def.resolvedUrl = self._resolveUrl(def.url, def.path);
+
+        for(var i = 0; i < libs.length; i++){
+            var def = libs[i];
+            def.resolvedUrl = self._resolveUrl2(def.url, def.path, self.aliasMap1.map);
             self._cogAddRequirement(def.resolvedUrl, def.preload, def.name, def.isRoute, def);
-        });
+        };
 
         if(self.requirements.length == 0) {
             self._cogInitialize();
@@ -1473,11 +897,13 @@
 
         var mi = this;
 
-
         if(!mi.isAlloy) {
             mi._determineAlloys();
             mi._exposeAlloys();
         }
+
+        mi._cogAliasMap2(); // apply alloy aliases, if any
+        //console.log("INIT:" + mi.resolvedUrl + ":" + mi.resolvedPath, mi.aliasMap3.map);
 
         mi._requirementsLoaded = true;
 
@@ -1516,7 +942,7 @@
                     for(j = 0; j < libs.length; j++){
                         var def = libs[j];
                         def.path = def.path || determinePathFromFullUrl(urlReady);
-                        var resolvedURL = self._resolveUrl(def.url, def.path);
+                        var resolvedURL = self._resolveUrl2(def.url, def.path, self.aliasMap1.map);
                         if(self.requirementsSeen[resolvedURL])
                             continue;
                         newReq = createRequirement(resolvedURL, def.preload, urlReady, def.name, def.isRoute, def);
@@ -1672,7 +1098,7 @@
     function getPlaceholderDiv(){
         if(placeholderDivPool.length > 0)
             return placeholderDivPool.pop();
-        return Rei(placeholderDiv.cloneNode(false));
+        return dom(placeholderDiv.cloneNode(false));
     }
 
     function returnPlaceholderDiv(div){
@@ -1776,18 +1202,13 @@
 
         if(htmlSel && htmlSel.hasChildNodes())
             cacheMap[url] = htmlSel;
-        declarationMap[url] = extractDeclarations(blueSel);
+        declarationMap[url] = parser.extractDeclarations(blueSel);
 
         scriptMap[url] = activeScriptData;
 
         activeScriptData = null;
 
     }
-
-    function throwParseError(sel, dataType, propName){
-        console.log("PARSE ERROR:"+dataType+":"+propName+":"+activeProcessURL);
-    }
-
 
     function wrapScript(scriptText, url) {
         return scriptText + "\n//# sourceURL=http://cognition" + url + "";
@@ -1805,13 +1226,7 @@
 
     }
 
-    MapItem.prototype._cogAssignUrl = function(url) {
-        if(this.resolvedUrl)
-            throw(new Error('url was already resolved!'));
-        this.url = url;
-        this.resolvedUrl = this._resolveUrl(url);
-        this.path = this._determinePathFromFullUrl(this.resolvedUrl);
-    };
+
 
     MapItem.prototype._cogDownloadUrl = function (){
 
@@ -1853,6 +1268,26 @@
         if(full.indexOf("..")===-1)
             return full;
         return from._collapseRelativePath(full);
+    };
+
+    MapItem.prototype._resolveUrl2 = function(url, path, map){
+
+        var from = this;
+        url = map[url] || url;
+        path = from._resolvePath2(path, map);
+        var raw = (url.indexOf("/")===0 || url.indexOf("http://")===0 || url.indexOf("https://")===0);
+        var full =  (path && !raw) ? path + url : url;
+        if(full.indexOf("..")===-1)
+            return full;
+        return from._collapseRelativePath(full);
+    };
+
+    MapItem.prototype._resolvePath2 = function(path, map){
+
+        var actualPath = (path && map[path]) || path || this.resolvedPath;
+        actualPath = actualPath ? this._endWithSlash(actualPath) : "/";
+        return actualPath;
+
     };
 
     MapItem.prototype._collapseRelativePath = function(url){
@@ -1908,7 +1343,7 @@
 
 
     MapItem.prototype.createAlias = function(def){
-        var url = this.aliasMap[def.name] = this._resolveUrl(def.url, def.path);
+        var url = this.aliasMap[def.name] = this._resolveUrl2(def.url, def.path, this.aliasMap1.map);
         if(def.prop)
             this.exposeProp(def.name, url);
         return url;
@@ -2463,6 +1898,14 @@
 
     };
 
+    function extractDefaultFeedDefFromServiceDef(def){
+        return {
+            name: def.name,
+            to: def.to,
+            service: def.name
+        };
+    }
+
     var Service = function(){
 
         this._mapItem = null;
@@ -2481,6 +1924,7 @@
         service._name = name;
 
         var resolvedUrl = mi._resolveUrl(def.url, def.path);
+        //var ruu = mi._resolveUrl2(def.url, def.path, mi.aliasMap2.map);
         var settings = {};
         settings.type = (def.post) ? 'POST' : 'GET';
         settings.dataType = def.format;
@@ -2541,341 +1985,6 @@
         return this._defaultFeed.parse(parseFunc);
     };
 
-    var Rei = function(domish){  // element, node, Rei, fragment or array-like (to fragment)
-        if(domish._dom)
-            return domish; // Rei returns itself if duck-wrapped
-        return new Rei.prototype.init(domish);
-    };
-
-    window.Rei = Rei;
-
-    Rei.prototype.init = function(domish){
-        this._memory = {};
-        this._nodes = [];
-        this._dom = this._fromDom(domish); // pushes nodes as created for performance
-        this[0] = this._nodes[0];
-    };
-
-    Rei.prototype.init.prototype = Rei.prototype;
-
-    Rei.prototype.rawContent = Rei.prototype.raw = function(){
-        return this[0];
-    };
-
-
-
-    Rei.prototype._fromDom = function(domish){
-
-        var i, frag, children, count, node;
-        var nodes = this._nodes;
-
-        domish = domish._dom || domish; // remove Rei content wrapper if present
-
-        if(domish.nodeType === 1) { // element node
-            nodes.push(domish);
-            return domish;
-        }
-
-        if(domish.nodeType === 11) { // element/frag node
-            children = domish.children;
-            count = children.length;
-            for(i = 0; i < count; i++){
-                nodes.push(children[i]);
-            }
-            return (count === 1) ? nodes[0] : domish;
-        }
-
-        if(Array.isArray(domish) || domish.length) {
-
-            count = domish.length;
-            for(i = 0; i < count; i++){
-                node = domish[i];
-                nodes.push(node._dom || node); // convert Reis back to elements
-            }
-
-            if(count === 1)
-                return nodes[0];
-
-            frag = document.createDocumentFragment();
-            for(i = 0; i < count; i++){
-                node = nodes[i];
-                frag.appendChild(node); // convert Reis back to elements
-            }
-            return frag;
-        }
-        return null; // throw error todo
-
-    };
-
-    Rei.prototype.toArray = function(){
-        var raw = this.raw();
-        var arr;
-        if(raw.nodeType === 11){
-            arr = [];
-            for(var i = 0; i < raw.children.length; i++){
-                arr.push(raw[i]);
-            }
-        } else {
-            arr = [raw];
-        }
-        return arr;
-    };
-
-
-    Rei.prototype.detect = catbus.$.detect;
-
-
-    Rei.prototype.append = function(domish){
-
-        if(this._nodes.length !== 1)
-            throw new Error('cannot append to multiple nodes!');
-
-        var child = Rei(domish)._dom;
-        this[0].appendChild(child);
-
-        return this;
-    };
-
-    Rei.prototype.replaceWith = function(domish){
-
-        var newContent = Rei(domish)._dom;
-        var content = this[0];
-
-        content.parentNode.replaceChild(newContent, content);
-
-    };
-
-    Rei.prototype.focus = function(){
-        if(this._nodes.length !== 1)
-            throw new Error('cannot focus to multiple nodes!');
-        this[0].focus();
-        return this;
-    };
-
-    Rei.prototype.val = function(value){
-        if(arguments.length === 0)
-            return this[0].value;
-
-        this[0].value = value;
-    };
-
-    Rei.prototype.toggle = function(show, display){
-        return show ? this.show(display) : this.hide();
-    };
-
-    Rei.prototype.show = function(display){
-        this[0].style.display = display || this._memory.display || 'block';
-        return this;
-    };
-
-    Rei.prototype.hide = function(){
-        if(this[0].style.display === 'none')
-            return this;
-
-        this._memory.display =  this[0].style.display;
-        this[0].style.display = 'none';
-        return this;
-    };
-
-    Rei.prototype.vis = function(visibility){
-        this[0].style.visibility = visibility ? 'visible' : 'hidden';
-        return this;
-    };
-
-    Rei.prototype.text = function(text){
-        if(arguments.length === 0)
-            return this[0].textContent;
-        this[0].textContent = text;
-        return this;
-    };
-
-    Rei.prototype.first = function(){
-        return this[0];
-    };
-
-    Rei.prototype.last = function(){
-    };
-
-    Rei.prototype.html = function(html){
-        if(arguments.length === 0)
-            return this[0].innerHTML;
-        this[0].innerHTML = html;
-        return this;
-    };
-
-    Rei.prototype.empty = function(){
-        this[0].innerHTML = null;
-        return this;
-    };
-
-
-    Rei.prototype.on = function(type, handler, useCapture){
-        this[0].addEventListener(type, handler, useCapture);
-        return this;
-    };
-
-    Rei.prototype.off = function(type, handler, useCapture){
-        this[0].removeEventListener(type, handler, useCapture);
-        return this;
-    };
-
-    Rei.prototype.remove = function(){
-        var nodes = this._nodes;
-        var count = nodes.length;
-        for(var i = 0; i < count; i++){
-            var node = nodes[i];
-            if(node.parentNode){
-                node.parentNode.removeChild(node);
-            }
-        }
-
-        return this;
-    };
-
-    Rei.prototype.toggleClass = function(nameOrNames, add){
-
-        if(!nameOrNames) return false;
-        var names = nameOrNames.split(' ');
-
-        for(var i = 0; i < names.length; i++){
-            var name = names[i];
-            if(name) {
-                if(arguments.length == 2)
-                    this._toggleClass(name, add);
-                else
-                    this._toggleClassImplicitly(name);
-            }
-        }
-
-
-        return this;
-    };
-
-    Rei.prototype._toggleClass = function(name, setting){
-
-        var class_list = this[0].classList;
-
-        if(setting)
-            class_list.add(name);
-        else
-            class_list.remove(name);
-
-        return this;
-
-    };
-
-    Rei.prototype._toggleClassImplicitly = function(name){ // this is a bad way to do things, just for jquery compatibility
-
-        var class_list = this[0].classList;
-
-        if(!class_list.contains(name)) {
-            class_list.add(name);
-        } else {
-            class_list.remove(name);
-        }
-
-        return this;
-    };
-
-
-
-    Rei.prototype.addClass = function(nameOrNames){
-        var names = nameOrNames.split(' ');
-        var class_list = this[0].classList;
-        for(var i = 0; i < names.length; i++){
-            var name = names[i];
-            if(name)
-                class_list.add(name);
-        }
-        return this;
-    };
-
-
-    Rei.prototype.removeClass = function(nameOrNames){
-        if(!nameOrNames){
-            this.removeAllClasses();
-            return this;
-        }
-        var names = nameOrNames.split(' ');
-        var class_list = this[0].classList;
-        for(var i = 0; i < names.length; i++){
-            var name = names[i];
-            if(name)
-                class_list.remove(name);
-        }
-        return this;
-    };
-
-
-    Rei.prototype.removeAllClasses = function(){
-        var arr = [];
-        var i;
-        var list = this[0].classList;
-
-        for(i = 0; i < list.length; i++){
-            arr.push(list.item(i));
-        }
-
-        for(i = 0; i < arr.length; i++){
-            this.removeClass(arr[i]);
-        }
-
-        return this;
-    };
-
-
-    Rei.prototype.prop = function(nameOrOptions, value){
-        var element = this[0];
-        if(arguments.length === 0) return element;
-        if(arguments.length === 2) {
-            element[nameOrOptions] = value;
-        } else {
-            for(var p in nameOrOptions){
-                element[p] = nameOrOptions[p];
-            }
-        }
-        return this;
-    };
-
-
-    Rei.prototype.get = function(n){
-        return this._nodes[n];
-    };
-
-    Rei.prototype.css = function(nameOrOptions, value){
-        var style = this[0].style;
-        if(arguments.length === 0) return style;
-        if(arguments.length === 2) {
-            style[nameOrOptions] = value + '';
-        } else {
-            if(typeof nameOrOptions === 'string')
-                return this[0].style[nameOrOptions];
-            for(var p in nameOrOptions){
-                style[p] = nameOrOptions[p] + '';
-            }
-        }
-        return this;
-    };
-
-    Rei.prototype.attr = function(nameOrOptions, value){
-        var attributes = this[0].attributes;
-        if(arguments.length === 0) return attributes;
-        if(arguments.length === 2) {
-            this[0].setAttribute(nameOrOptions, value);
-        } else {
-            if(typeof nameOrOptions === 'string')
-                return this[0].getAttribute(nameOrOptions);
-            for(var p in nameOrOptions){
-                this[0].setAttribute(p, nameOrOptions[p]);
-            }
-        }
-        return this;
-    };
-
-    Rei.prototype.removeAttr = function(name){
-        this[0].removeAttribute(name);
-        return this;
-    };
 
     var WebService = function() {
 
@@ -2936,6 +2045,7 @@
         settings = copyProps(settings, defaults); // override defaults
 
         settings.resolvedUrl = this._cog._resolveUrl(settings.url, settings.path);
+        //var huu = this._cog._resolveUrl2(settings.url, settings.path, this._cog.aliasMap2.map);
         this._settings = settings;
 
         return this;
