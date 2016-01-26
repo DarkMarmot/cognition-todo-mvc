@@ -30,6 +30,8 @@
     else
         context.Kakashi = Kakashi; // bind to outer context
 
+    var bus = plugins ? plugins.monolith('catbus') : context.Catbus;
+    var tree = bus.demandTree('KAKASHI'); // todo host should be defined within a tree
     var fileContextHash = {}; // by fromFile then by aliasMapId -> value: {id: map_id, aliasMap: {id: #, map: aliasMap}, fromFile: file}
     var uid = 0;
 
@@ -85,24 +87,33 @@
 
     }
 
-
     var AliasContext = function(fromFile, sourceMap){
 
+        this.id = ++uid;
         this.fromFile = fromFile;
         this.aliasMap = sourceMap || createEmptyAliasMap();
-        this.resolvedCache = {};
-        this.readyCache = {};
+        this.resolvedCache = {}; // map of contextual url or alias -> resolvedUrl
         var fileContext = demandFileContext(fromFile);
         fileContext[this.aliasMap.id] = this;
 
     };
 
-    AliasContext.prototype.markReady = function(resolvedUrl){
-        this.readyCache[resolvedUrl] = true;
+    AliasContext.prototype.watchStatus = function(resolvedUrl){
+        var name = this.id + ':' + resolvedUrl;
+        var data = tree.demandData(name);
+        return data.on('update').change().once();// run as pseudo-promise on status 'ready' or 'failed'
+    };
+
+    AliasContext.prototype.markStatus = function(resolvedUrl, status){
+        var name = this.id + ':' + resolvedUrl;
+        var data = tree.demandData(name);
+        data.write(status);
     };
 
     AliasContext.prototype.isReady = function(resolvedUrl){
-        return this.readyCache.hasOwnProperty(resolvedUrl);
+        var name = this.id + ':' + resolvedUrl;
+        var data = tree.demandData(name);
+        return data.read() === 'ready';
     };
 
     AliasContext.prototype.resolveUrl = function(url){
@@ -182,7 +193,7 @@
         var newAliasContext = demandAliasContext(fromFile, oldAliasContext.aliasMap);
 
         // modify with valves and aliases if present
-        return newAliasContext.modify(newAliases, newValves)
+        return newAliasContext.modify(newAliases, newValves);
 
     };
 

@@ -394,7 +394,6 @@
         mi.cogZone = def.isRoute ? self.cogZone.demandChild(def.name, def.isRoute) : self.cogZone.demandChild(def.name);
 
         mi.target = def.target;
-        mi.action = def.action || 'append';
         mi.source = def.source;
         mi.sourceType = def.sourceType || 'prop';
         mi.item = def.item;
@@ -453,7 +452,6 @@
         mi.cogZone = def.isRoute ? self.cogZone.demandChild(def.name, def.isRoute) : self.cogZone.demandChild(def.name);
 
         mi.target = def.target;
-        mi.action = def.action || 'append';
         mi.source = def.source;
         mi.sourceType = def.sourceType || 'prop';
         mi.item = def.item;
@@ -463,7 +461,7 @@
         mi.urlType = def.urlType || 'string'; // s = string, d = data, p = prop
 
 
-        //mi.path = (def.path) ? self._resolvePath(def.path) : null;
+
         mi.path = (def.path) ? self._resolvePath2(def.path, self.aliasMap3.map) : self.path;
         mi.parent = self;
 
@@ -486,7 +484,7 @@
                 }
                 mi.targetNode = (self.isPinion) ? self.targetNode : (
                     (mi.target) ? self.scriptData[mi.target] : dom(self.localSel.last()[0]));
-                mi.targetNode.append(mi.placeholder);  //[mi.action](mi.placeholder);
+                mi.targetNode.append(mi.placeholder);
             } else {
                 mi.placeholder = placeholder;
             }
@@ -1138,6 +1136,17 @@
         return tmp.firstChild;
     }
 
+
+    MapItem.prototype._cogDownloadUrl2 = function (){
+
+        downloader.downloadFiles([this.resolvedUrl]);
+
+        var self = this;
+        var urlPlace = bus.location("n-url:"+ self.resolvedUrl);
+        tryToDownload(self.resolvedUrl);
+        urlPlace.on("done").as(self).host(self.uid).run(self._cogBecomeUrl).once().autorun();
+
+    };
 
 
     MapItem.prototype._cogDownloadUrl = function (){

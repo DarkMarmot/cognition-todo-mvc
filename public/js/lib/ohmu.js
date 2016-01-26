@@ -53,19 +53,7 @@
         return fileErrorHash[file];
     };
 
-    ohmu.downloadFiles = function ohmu_downloadFiles(files){ // array of resolved urls
-
-        var batchId = ++uid + ':ohmu';
-        var batchStatus = tree.demandData('ohmuBatch');
-        batchStatus.write('new', batchId);
-
-        var batchSensor = batchStatus.on(batchId).change();
-        var dropSensor = batchStatus.on(batchId).change().filter(isReady).batch().run(
-            function(){
-                console.log('dropping:',batchId);
-                bus.dropHost(batchId);
-            }
-        );
+    ohmu.downloadFiles = function ohmu_downloadFiles(files, success, failure){ // array of resolved urls
 
         var incompleteFiles = [];
 
@@ -78,9 +66,24 @@
         }
 
         if(incompleteFiles.length === 0){
-            batchStatus.write('ready', batchId);
-            return batchSensor;
+            success();
         }
+
+        var batchId = ++uid + ':ohmu';
+        var batchStatus = tree.demandData('ohmuBatch');
+        batchStatus.write('new', batchId);
+
+        var batchSensor = batchStatus.on(batchId).change();
+        var dropSensor = batchStatus.on(batchId).change().filter(isReady).batch().run(
+            function(){
+                console.log('dropping:', batchId);
+                bus.dropHost(batchId);
+            }
+        );
+
+
+
+
 
         var fileContent = fileStatusZone.demandData(incompleteFiles);
 
@@ -102,8 +105,6 @@
 
 
     function download(file){
-
-        console.log('download:',file);
 
         var data = fileStatusZone.demandData(file);
 

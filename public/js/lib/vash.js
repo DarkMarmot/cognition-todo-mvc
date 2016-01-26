@@ -553,8 +553,7 @@
             url: extractString2(node, "url"),
             source: extractString2(node, 'use') || extractString2(node, 'from,source'),
             item: extractString2(node, 'make') || extractString2(node, 'to,item','cog'),
-            target: extractString2(node, "id,find"),
-            action: extractString2(node, "and", 'append')
+            target: extractString2(node, "id,find")
 
         };
 
