@@ -138,6 +138,15 @@
 
     Vash.parseFile = function(url, text){
 
+        function endsWith(entireStr, ending){
+            return (entireStr.lastIndexOf(ending) === (entireStr.length - ending.length) && entireStr.length > ending.length);
+        }
+
+        var isHTML = endsWith(url, ".html");
+
+        if(!isHTML)
+            return;
+
         var frag = buildFragment(text);
 
         var blueSel = childNodesByName(frag.querySelector('blueprint'));
@@ -263,10 +272,10 @@
         decs.cogs = [].concat(getDefs2(sel.cog, extractCogDef2));
         decs.chains = [].concat(getDefs2(sel.chain, extractChainDef2));
         decs.requires = [].concat(getDefs2(sel.require, extractLibraryDef2, true));
-        decs.requires = decs.requires.concat(getDefs2(sel.hoist, extractAlloyDef2));
-        decs.requires = decs.requires.concat(getDefs2(sel.alloy, extractAlloyDef2));
+        decs.alloys = [].concat(getDefs2(sel.hoist, extractAlloyDef2));
+        decs.alloys = [].concat(getDefs2(sel.alloy, extractAlloyDef2));
         decs.requires = decs.requires.concat(getDefs2(sel.preload, extractPreloadDef2, true));
-
+        decs.requires = decs.requires.concat(decs.alloys);
         return decs;
     }
 

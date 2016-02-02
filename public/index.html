@@ -17,18 +17,16 @@
         <script src="js/lib/catbus.js"></script>
         <script src="js/lib/rei.js"></script>
         <script src="js/lib/vash.js"></script>
-        <script src="js/lib/kakashi.js"></script>  <!-- alias/file resolver -->
         <script src="js/lib/ohmu.js"></script>  <!-- batch file loader -->
+        <script src="js/lib/kakashi.js"></script>  <!-- alias/file resolver -->
+
         <script src="js/lib/cognition.js"></script>
-
-
-
 
 
         <script>
 
             $(function(){
-                $.cognition.init($("#todo_app")[0], "todo_app/cogs/app.html", "grue/grue.html");
+                $.cognition.init($("#todo_app")[0], "/todo_app/app.html", "/grue/grue.html");
             });
 
         </script>

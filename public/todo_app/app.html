@@ -1,18 +1,23 @@
 <blueprint>
 
-    <preload url="footer.html, header.html, main.html, item.html, itemEdit.html, itemView.html" />
 
+    <alias name="ALLOYS" url="alloys" />
+    <alias name="COGS" url="cogs" />
+    <alias name="BUTTONS" url="buttons" path="COGS" />
 
-    <alloy url="../alloys/storage.html" />
-    <alloy url="../alloys/routes.html" />
+    <preload url="footer.html, header.html, main.html, item.html, itemEdit.html, itemView.html" path="COGS" />
+
+    <alloy url="storage.html" path="ALLOYS" />
+    <alloy url="routes.html" path="ALLOYS" />
 
     <sensor watch="storage" adapt="hasItems" change="true" run="render" />
 
-    <cog find="main" url="main.html" />
-    <cog find="header" url="header.html" />
-    <cog find="footer" url="footer.html" />
+    <cog find="main" url="cogs/main.html" />
+    <cog find="header" url="header.html" path="COGS" />
+    <cog find="footer" url="footer.html" path="COGS" />
 
 </blueprint>
+
 
 <display>
 
@@ -59,6 +64,7 @@
 
 <script>
     $.cog({
+
 
         hasItems: function(msg) { return msg.length > 0; },
 

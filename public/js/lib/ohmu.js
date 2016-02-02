@@ -31,13 +31,14 @@
 
     var ohmu = Ohmu;
     var bus = plugins ? plugins.monolith('catbus') : context.Catbus;
+    var parser = plugins ? plugins.monolith('vash') : context.Vash;
 
     var tree = bus.demandTree('OHMU'); // todo host should be defined within a tree
 
     var fileStatusZone = tree.demandChild('fileContent'); // name is file, topics: update
     var fileTextHash = {}; // files already loaded are here as key file, value text
-
     var fileErrorHash = {}; // array of errors by file if present
+
     var suffixOnRequests = '';
 
     var isReady = function(msg){ return msg === 'ready';};
@@ -53,7 +54,15 @@
         return fileErrorHash[file];
     };
 
-    ohmu.downloadFiles = function ohmu_downloadFiles(files, success, failure){ // array of resolved urls
+    ohmu.downloadFiles = function ohmu_downloadFiles(files, statusHandler){ // array of resolved urls
+
+        if(typeof files === 'string')
+            files = [files];
+
+        if(files.length === 0) {
+            statusHandler('ready');
+            return;
+        }
 
         var incompleteFiles = [];
 
@@ -65,25 +74,19 @@
             }
         }
 
-        if(incompleteFiles.length === 0){
-            success();
+        if(incompleteFiles.length === 0) {
+            statusHandler('ready');
+            return;
         }
 
-        var batchId = ++uid + ':ohmu';
-        var batchStatus = tree.demandData('ohmuBatch');
-        batchStatus.write('new', batchId);
+        var batchId = ++uid + ':ohmu_batch';
+        var batchStatus = tree.demandData('batch');
+        batchStatus.write('pending', batchId);
 
-        var batchSensor = batchStatus.on(batchId).change();
-        var dropSensor = batchStatus.on(batchId).change().filter(isReady).batch().run(
-            function(){
-                console.log('dropping:', batchId);
-                bus.dropHost(batchId);
-            }
-        );
-
-
-
-
+        batchStatus.on(batchId).host(batchId).change().run(function(msg){
+            statusHandler(msg);
+            bus.dropHost(batchId);
+        });
 
         var fileContent = fileStatusZone.demandData(incompleteFiles);
 
@@ -92,14 +95,12 @@
         var allFilesReady = filesReady.merge('status').group().batch().need(incompleteFiles)
             .emit(batchId).transform('ready').pipe(batchStatus).host(batchId);
 
-        var someFileFailed = fileContent.on('status').filter(isFailed)
+        fileContent.on('status').filter(isFailed)
             .emit(batchId).transform('failed').pipe(batchStatus).host(batchId);
 
 
         filesReady.auto();
         allFilesReady.auto();
-
-        return batchSensor;
 
     };
 
@@ -110,16 +111,14 @@
 
         if(!data.read('status')) {
             data.write('new','status');
-            fileTextHash[file] = null;
-            fileErrorHash[file] = null;
             tryDownload(file);
         }
 
     }
 
 
-    ohmu.suffix = function suffix(suffix){
-        suffixOnRequests = suffix;
+    ohmu.cacheBuster = function cacheBuster(uniqueString){
+        suffixOnRequests = uniqueString;
     };
 
 
@@ -131,6 +130,7 @@
             .done(function(response, status, xhr ){
 
                 fileTextHash[file] = response;
+                parser.parseFile(file, response);
                 data.write('ready', 'status');
 
             })

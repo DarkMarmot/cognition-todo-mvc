@@ -1,4 +1,4 @@
-;(function REI(context) {
+;(function REI() {
 
     var Rei = function(domish){  // element, node, Rei, fragment or array-like (to fragment)
         if(domish._dom)
@@ -6,7 +6,12 @@
         return new Rei.prototype.init(domish);
     };
 
-    window.Rei = Rei;
+    var externalContext = this;
+    var plugins = typeof seele !== 'undefined' && seele;
+    if(plugins)
+        plugins.register('rei', Rei, true);
+    else
+        externalContext.Rei = Rei; // bind to outer context
 
     Rei.prototype.init = function(domish){
         this._memory = {};
@@ -79,9 +84,6 @@
         }
         return arr;
     };
-
-
-    Rei.prototype.detect = catbus.$.detect;
 
 
     Rei.prototype.append = function(domish){
@@ -336,10 +338,6 @@
         return this;
     };
 
-    var plugins = typeof seele !== 'undefined' && seele;
-    if(plugins)
-        plugins.register('rei', Rei, true);
 
-    context.Rei = Rei; // bind to outer context
 
-})(this);
+}).call(this);

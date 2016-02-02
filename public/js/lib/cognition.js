@@ -1,7 +1,7 @@
 ;(function($, window) {
 
     /**
-     * cognition.js (v1.5.3-kakashi)
+     * cognition.js (v2.0.1-arg)
      *
      * Copyright (c) 2015 Scott Southworth, Landon Barnickle, Nick Lorenson & Contributors
      *
@@ -27,6 +27,7 @@
     var parser = cognition.plugins.monolith('vash'); // turns blueprints into json
     var resolver = cognition.plugins.monolith('kakashi'); // resolves aliases and urls in contexts
     var downloader = cognition.plugins.monolith('ohmu'); // downloads batches of files
+    //var fetcher = cognition.plugins.monolith('???'); // ajax/fetch actions
 
     var uid = 0;
 
@@ -39,8 +40,6 @@
     var DATA = 'data';
     var NUMBER = 'number';
     var PROP = 'prop';
-    var FEED = 'feed';
-    var SERVICE = 'service';
     var STRING = 'string';
     var RUN = 'run';
     var BOOLEAN = 'bool';
@@ -99,8 +98,7 @@
         root.localSel = dom(node);
         root.targetNode = dom(node);
         root.isPinion = true;
-        root.aliasContext1 = root.aliasContext2 = root.aliasContext3 = resolver.resolveAliasContext(url);
-        root.aliasMap3 = {id: ++uid, map: {}};
+        root.aliasContext1 = root.aliasContext2 = root.aliasContext3 = resolver.resolveAliasContext();
         root.createCog({url:url});
         if(debugUrl)
             root.createCog({url: debugUrl});
@@ -136,7 +134,7 @@
             mapItem.scriptData.mapItem = null;
         mapItem.scriptData = null;
         mapItem.parent = null;
-        mapItem.itemPlace = null;
+
         mapItem.destroyed = true;
         mapItem.requirements = null;
 
@@ -168,22 +166,14 @@
         this.parent = null;
         this.adapter = null;
         this.alloys = [];
-        this.serviceMap = {};
-        this.feedMap = {};
-        this.aliasMap = {};
-        this.aliasMap1 = null; // alias map provides alloy loading context
-        this.aliasMap2 = null; // alias map provides cog loading context
-        this.aliasMap3 = null; // alias map provides valve restricted context for children
         this.dataMap = {};
         this.valveMap = null;
         this.methodMap = {};
         this.childMap = {};
         this.webServiceMap = {};
-        this.itemPlace = null;
+
         this.uid = ++uid;
         this.destroyed = false;
-        this.requirements = [];
-        this.requirementsSeen = {};
         this.itemData = null;
         this.itemKey = null;
         this.itemDataLoc = null;
@@ -218,28 +208,10 @@
         return values;
     };
 
-    MapItem.prototype.on = function(topic){
-        return this.itemPlace.on(topic);
-    };
-
-
-    MapItem.prototype.tell = MapItem.prototype.write= function(msg, topic) {
-        this.itemPlace.write(msg, topic);
-    };
 
     MapItem.prototype.destroy = function(){
         destroyMapItem(this);
     };
-
-
-    function determinePathFromFullUrl(url){
-        var lastSlashPos = url.lastIndexOf("/");
-        if(lastSlashPos === 0)
-            return "/";
-        if(lastSlashPos < url.length - 1 && lastSlashPos > 0)
-            url = url.substring(0,lastSlashPos + 1);
-        return url;
-    }
 
 
     function copyProps(source, target){
@@ -257,13 +229,9 @@
     var FIRST_COG_DECLARATIONS = [
 
         {name: 'properties', method: 'createProp'},
-        {name: 'valves', method: 'createValve'},
-        {name: 'aliases', method: 'createAlias'},
         {name: 'adapters', method: 'createAdapter'},
         {name: 'dataSources', method: 'createData'},
         {name: 'commands', method: 'demandData'},
-        {name: 'services', method: 'createService'},
-        {name: 'feeds', method: 'createFeed'},
         {name: 'methods', method: 'createMethod'}
 
     ];
@@ -351,8 +319,6 @@
 
         self.scriptData.start();
 
-        //self._declarationDefs = null;
-
 
     };
 
@@ -372,76 +338,24 @@
         mi.scriptData.mapItem = mi;
         self.childMap[mi.uid] = mi;
 
+        mi.url = self._resolveValueFromType(mi.url, mi.urlType);
 
-        mi.resolvedUrl = mi._resolveUrl2(url, self.path, self.aliasMap3.map);
-        mi.resolvedPath = mi.path = determinePathFromFullUrl(mi.resolvedUrl);
+      //  console.log('LINK:', mi.url, mi.urlType);
+
+        mi.resolvedUrl = self.aliasContext3.resolveUrl(mi.url);
+
+        mi.aliasContext0 = mi.aliasContext1 = mi.aliasContext2 = mi.aliasContext3 =
+            resolver.resolveAliasContext(mi.url, self.aliasContext3);
 
         mi.placeholder = getPlaceholderDiv(); // $('<div style="display: none;"></div>');
         self.targetNode.append(mi.placeholder);
 
         mi.itemDataLoc = mi.createData({name: name, value: data});
 
-        mi._cogDownloadUrl(mi.url);
+        downloader.downloadFiles(mi.resolvedUrl, mi._cogBecomeUrl.bind(mi));
         return mi;
 
     };
-
-    MapItem.prototype.createCog2 = function(def, placeholder){
-
-        var self = this;
-        var mi = new MapItem();
-
-        mi.cogZone = def.isRoute ? self.cogZone.demandChild(def.name, def.isRoute) : self.cogZone.demandChild(def.name);
-
-        mi.target = def.target;
-        mi.source = def.source;
-        mi.sourceType = def.sourceType || 'prop';
-        mi.item = def.item;
-        mi.itemType = def.itemType;
-        mi.name = def.name;
-        mi.url =  def.url;
-        mi.urlType = def.urlType || 'string';
-        mi.parent = self;
-
-        mi.scriptData.mapItem = mi;
-        self.childMap[mi.uid] = mi;
-
-        if(mi.urlType !== 'data') {
-
-            mi.url = self._resolveValueFromType(mi.url, mi.urlType);
-
-            mi.aliasContext1 = resolver.resolveAliasContext(mi.url, self.aliasContext3, def.aliases);
-            mi.resolvedUrl = mi.aliasContext1.resolveURL(mi.url);
-
-            if(!placeholder) {
-
-                mi.placeholder = getPlaceholderDiv();
-                mi.targetNode = (self.isPinion) ? self.targetNode : self.scriptData[mi.target];
-                mi.targetNode.append(mi.placeholder);
-
-            } else {
-
-                mi.placeholder = placeholder;
-
-            }
-
-            mi._cogDownloadUrl(mi.url);
-
-        } else {
-
-            mi.aliasContext = resolver.resolveAliasContext(mi.url, self.aliasContextFinal || self.aliasContext);
-            mi.isPinion = true;
-            mi.aliasContext1 = mi.aliasContext2 = mi.aliasContext3 = self.aliasContext3;
-            mi.targetNode = self.scriptData[mi.target];
-            mi.urlFromPlace = mi.cogZone.findData(mi.url).on('update').change().as(mi).host(mi.uid).run(mi._cogReplaceUrl2).autorun();
-
-        }
-
-        return mi;
-
-    };
-
-
 
 
     MapItem.prototype.createCog = function(def, placeholder){
@@ -458,11 +372,10 @@
         mi.itemType = def.itemType;
         mi.name = def.name;
         mi.url =  def.url;
-        mi.urlType = def.urlType || 'string'; // s = string, d = data, p = prop
+        mi.urlType = def.urlType || 'string';
 
+    //    console.log('COG:', mi.url, mi.urlType);
 
-
-        mi.path = (def.path) ? self._resolvePath2(def.path, self.aliasMap3.map) : self.path;
         mi.parent = self;
 
         mi.scriptData.mapItem = mi;
@@ -471,42 +384,29 @@
         if(mi.urlType !== 'data') {
 
             mi.url = self._resolveValueFromType(mi.url, mi.urlType);
-
-            mi.resolvedUrl = mi._resolveUrl2(mi.url, mi.path, self.aliasMap3.map);
-            mi.resolvedPath = mi.path = determinePathFromFullUrl(mi.resolvedUrl);
+            mi.resolvedUrl = self.aliasContext3.resolveUrl(mi.url, def.path);
+            mi.aliasContext0 = resolver.resolveAliasContext(mi.resolvedUrl, self.aliasContext3);
 
             if(!placeholder) {
 
                 mi.placeholder = getPlaceholderDiv();
-                if(!mi.target && !self.targetNode){
-                    console.log('error1! -- would need last from localsel??',self, self.resolvedUrl, self.localSel);
-                    // was: mi.targetNode = (mi.target) ? self.scriptData[mi.target] : self.localSel.last();
-                }
-                mi.targetNode = (self.isPinion) ? self.targetNode : (
-                    (mi.target) ? self.scriptData[mi.target] : dom(self.localSel.last()[0]));
+                mi.targetNode = (self.isPinion) ? self.targetNode : self.scriptData[mi.target];
                 mi.targetNode.append(mi.placeholder);
+
             } else {
+
                 mi.placeholder = placeholder;
+
             }
-            mi._cogDownloadUrl(mi.url);
+
+            downloader.downloadFiles(mi.resolvedUrl, mi._cogBecomeUrl.bind(mi));
 
         } else {
 
-
-            // todo make a createPinion function for clarity ???
             mi.isPinion = true;
-            mi._requirementsLoaded = true;
-
-            if(!mi.target){
-                console.log('error! -- would need last from localsel??');
-                // was: mi.targetNode = (mi.target) ? self.scriptData[mi.target] : self.localSel.last();
-            }
-
-            mi.aliasMap1 = mi.aliasMap2 = mi.aliasMap3 = self.aliasMap3;
-            mi.path = self.path;
-
+            mi.aliasContext0 = mi.aliasContext1 = mi.aliasContext2 = mi.aliasContext3 = self.aliasContext3;
             mi.targetNode = self.scriptData[mi.target];
-            mi.urlFromPlace = mi.cogZone.findData(mi.url).on('update').change().as(mi).host(mi.uid).run(mi._cogReplaceUrl).autorun();
+            mi.cogZone.findData(mi.url).on('update').change().as(mi).host(mi.uid).run(mi._cogReplaceUrl).autorun();
 
         }
 
@@ -533,21 +433,17 @@
         mi.name = def.name;
         mi.listKey = def.key;
         mi.url =  def.url;
-        mi.path = (def.path) ? self._resolvePath(def.path) : self.path;
         mi.parent = self;
-        mi.aliasProto = mi.aliasFinal = self.aliasFinal; // new aliases can't be defined in a chain
         mi.scriptData.mapItem = mi;
         self.childMap[mi.uid] = mi;
 
         mi.targetNode = self.scriptData[mi.target];
 
-        mi.aliasMap1 = mi.aliasMap2 = mi.aliasMap3 = self.aliasMap3;
-        mi.aliasContext = resolver.resolveAliasContext(mi.url, self.aliasContextFinal || self.aliasContext);
+        mi.aliasContext0 = mi.aliasContext1 = mi.aliasContext2 = mi.aliasContext3 = self.aliasContext3;
 
-        var resolvedUrl = self._resolveUrl2(def.url, def.path, self.aliasMap1.map);
-        var urlPlace = bus.location("n-url:"+resolvedUrl);
-        tryToDownload(resolvedUrl);
-        urlPlace.on("done").as(mi).host(mi.uid).run(mi._seekListSource).once().autorun();
+        var resolvedUrl = mi.aliasContext0.resolveUrl(def.url);
+        downloader.downloadFiles(resolvedUrl, mi._seekListSource.bind(mi));
+
         return mi;
 
     };
@@ -585,11 +481,11 @@
         self.cogZone.insertParent(alloy.cogZone);
 
         alloy.url = def.url;
-        alloy.aliasContext = resolver.resolveAliasContext(def.url, alloy.origin.aliasContextFinal);
-        alloy.resolvedUrl = alloy._resolveUrl2(def.url, self.path, self.aliasMap1.map);
-        alloy.resolvedPath = alloy.path = determinePathFromFullUrl(alloy.resolvedUrl);
+        alloy.resolvedUrl = alloy.origin.aliasContext1.resolveUrl(def.url, def.path);
+        alloy.aliasContext0 = resolver.resolveAliasContext(def.url, alloy.origin.aliasContext2);
 
         alloy._cogBecomeUrl();
+        return alloy;
 
     };
 
@@ -776,14 +672,12 @@
         sd.index = mi.itemOrder;
         sd.key = mi.itemKey;
 
-       // var contextParent = mi.parent.isAlloy ? mi.parent : alloy.origin;
-
-        mi._cogAliasMap1();
+        mi.aliasContext1 = resolver.resolveAliasContext(mi.resolvedUrl, mi.aliasContext0, mi._declarationDefs.aliases);
+        mi.aliasContext2 = mi.aliasContext1; // later modified if alloys contain aliases
 
         if(mi.isAlloy) {
             mi._cogInitialize();
         } else {
-
 
             var nodes = display.querySelectorAll('[id]');
             for(var i = 0; i < nodes.length; i++){
@@ -800,87 +694,49 @@
     };
 
 
-    // cog first makes alloy loading context (using parent external context + aliases)
-    // child / active loading context same if no alloys, from last alloy otherwise
-    // external context -- applies valves
-
-    // alloy -- use origin's last alloy context (active loading context)
-    // for alloys and libraries, (parent.aliasMap3 or origin.aliasMap1) + locally defined aliases
-    MapItem.prototype._cogAliasMap1 = function(){
-
-        var baseAliasMap = (this.isAlloy ? this.origin.aliasMap1 : this.parent.aliasMap3) || {id: ++uid, map: {}};
-
-        var aliasDefs = this._declarationDefs.aliases;
-        if(aliasDefs.length === 0){
-            this.aliasMap1 = baseAliasMap;
-            return;
-        }
-
-        var newAliasMap = {id: ++uid, map: {}};
-
-        copyProps(baseAliasMap.map, newAliasMap.map);
-        for(var i = 0; i < aliasDefs.length; i++){
-            var def = aliasDefs[i];
-            var url = this._resolveUrl2(def.url, def.path, newAliasMap.map);
-            newAliasMap.map[def.name] = url;
-        }
-
-        //console.log('ALIAS_MAP:'+this.resolvedUrl, newAliasMap);
-        this.aliasMap1 = newAliasMap;
-    };
-
-
-    // for loading child cogs, local.aliasMap1 + merged aliases of alloys
-    MapItem.prototype._cogAliasMap2 = function(){
-
-        if(this.isAlloy || this.isPinion || this.isChain) {
-            this.aliasMap2 = this.aliasMap3 = this.aliasMap1;
-            return;
-        }
-
-        var baseAliasMap = this.aliasMap1;
-        var alloys = this.alloys;
-        var alloy = null;
-        var newAliasMap = null;
-
-        for(var i = 0; i < alloys.length; i++){
-
-            alloy = alloys[i];
-            var aliasDefs = alloy._declarationDefs.aliases;
-
-            if(aliasDefs.length !== 0){
-
-                if(!newAliasMap) {
-                    newAliasMap = {id: ++uid, map: {}};
-                    copyProps(baseAliasMap.map, newAliasMap.map);
-                }
-
-                for(var j = 0; j < aliasDefs.length; j++){
-                    var def = aliasDefs[j];
-                    var url = this._resolveUrl2(def.url, def.path, newAliasMap.map);
-                    newAliasMap.map[def.name] = url;
-                }
-
-            }
-        }
-
-        newAliasMap = newAliasMap || baseAliasMap;
-        this.aliasMap2 = this.aliasMap3 = newAliasMap;
-
-    };
-
-    // within child cogs, local.aliasMap2 + local valves to restrict access upwards
-    MapItem.prototype._cogAliasMap3 = function(){
-
-    };
-
-
     MapItem.prototype._cogReplaceUrl = function(url){
 
         this.clearContent();
 
         if(url)
             this.createCog({url: url});
+
+    };
+
+    MapItem.prototype._cogPreInitialize = function(){
+
+        var requirements = this._declarationDefs.requires;
+
+        for(var i = 0; i < requirements.length; i++){
+            var req = requirements[i];
+            var url = req.resolvedUrl;
+
+            if(!libraryMap[url]) { // limits script execution to once per url
+                libraryMap[url] = url;
+                if(endsWith(url,".js")) {
+                    var scriptText = downloader.fileText(url);
+                    scriptText = wrapScript(scriptText, url);
+                    addScriptElement(scriptText);
+                }
+            }
+
+        }
+
+        var alloys = this._declarationDefs.alloys;
+
+        for(i = 0; i < alloys.length; i++){
+
+            var def = alloys[i];
+            def.url = def.resolvedUrl; // todo remove hack?
+            var alloy = this.createAlloy(def);
+            this.aliasContext2 = this.aliasContext2.addContext(alloy.aliasContext1);
+
+        }
+
+        var valves = this._declarationDefs.valves;
+
+        this.aliasContext3 = valves.length ? this.aliasContext2.modify([], valves) : this.aliasContext2;
+        this._cogInitialize();
 
     };
 
@@ -891,17 +747,22 @@
 
         var libs = self._declarationDefs.requires;
 
+        var files = [];
         for(var i = 0; i < libs.length; i++){
             var def = libs[i];
-            def.resolvedUrl = self._resolveUrl2(def.url, def.path, self.aliasMap1.map);
-            self._cogAddRequirement(def.resolvedUrl, def.preload, def.name, def.isRoute, def);
-        };
-
-        if(self.requirements.length == 0) {
-            self._cogInitialize();
-        } else {
-            self._cogDownloadRequirements();
+            def.resolvedUrl = self.aliasContext1.resolveUrl(def.url, def.path);
+            files.push(def.resolvedUrl);
         }
+
+        downloader.downloadFiles(files, function(status){
+
+           if(status === 'ready') {
+               self._cogPreInitialize();
+           }
+           else
+               console.log(self.resolvedUrl + ' failed to load stuff');
+
+        });
 
     };
 
@@ -915,10 +776,6 @@
             mi._exposeAlloys();
         }
 
-        mi._cogAliasMap2(); // apply alloy aliases, if any
-        //console.log("INIT:" + mi.resolvedUrl + ":" + mi.resolvedPath, mi.aliasMap3.map);
-
-        mi._requirementsLoaded = true;
 
         if(mi.placeholder){
             mi.placeholder.replaceWith(mi.display);
@@ -936,93 +793,6 @@
 
 
 
-    MapItem.prototype._cogRequirementReady = function(urlReady) {
-
-        var req, i, j;
-        var self = this;
-        var allReady = true; // assertion to disprove
-        var match = -1;
-        var newReqs = [];
-        var newReq;
-
-        for(i = 0; i < self.requirements.length; i++) {
-            req = self.requirements[i];
-            if(req.url === urlReady && !req.ready) {
-                match = i;
-                req.ready = true;
-                if(endsWith(urlReady,".html")){
-                    var libs = parser.blueprint(urlReady).requires;
-                    for(j = 0; j < libs.length; j++){
-                        var def = libs[j];
-                        def.path = def.path || determinePathFromFullUrl(urlReady);
-                        var resolvedURL = self._resolveUrl2(def.url, def.path, self.aliasMap1.map);
-                        if(self.requirementsSeen[resolvedURL])
-                            continue;
-                        newReq = createRequirement(resolvedURL, def.preload, urlReady, def.name, def.isRoute, def);
-                        newReqs.push(newReq);
-                        self.requirementsSeen[resolvedURL] = newReq;
-                    }
-                    if(newReqs.length > 0)
-                        allReady = false;
-
-                }
-            }
-            allReady = allReady && req.ready;
-        }
-
-
-        for(i = 0; i < newReqs.length; i++){
-            newReq = newReqs[i];
-            self.requirements.splice(match, 0, newReq); // put new requirements after last match
-        }
-
-        for(i = 0; i < newReqs.length; i++){
-            newReq = newReqs[i];
-            tryToDownload(newReq.url);
-            newReq.place.on("done").as(self).host(self.uid).run(self._cogRequirementReady).once().autorun();
-        }
-
-        if(self._requirementsLoaded) {
-            console.log('ready called but loaded set?');
-            return;
-        }
-
-        if(!allReady)
-            return;
-
-        for(i = 0; i < self.requirements.length; i++){
-            req = self.requirements[i];
-            var url = req.url;
-
-            if(endsWith(url,".js")) {
-                if(!libraryMap[url]) { // limits script execution to once per url
-                    libraryMap[url] = url;
-                    var scriptText = req.place.read();
-                    scriptText = wrapScript(scriptText, url);
-                    addScriptElement(scriptText);
-                }
-            } else if(endsWith(url,".html")) {
-                if(!req.preload) {
-                    req.def.url = req.url || req.def.url; // todo need to redo all the filedownloads and mgmt
-                    self.createAlloy(req.def);
-                }
-            }
-        }
-
-        // check that new requirements are downloaded -- todo optimize all this
-        for(i = 0; i < self.requirements.length; i++){
-            req = self.requirements[i];
-            var status = req.place.peek("status");
-            if(!status || !status.msg || !status.msg.done) {
-                return; // requirements remain...
-            }
-        }
-
-        self._cogInitialize();
-
-    };
-
-
     function addScriptElement(scriptText) {
 
         var scriptEle = document.createElement("script");
@@ -1035,81 +805,6 @@
 
     }
 
-    function createRequirement(requirementUrl, preload, fromUrl, name, isRoute, def){
-        var urlPlace = bus.location("n-url:"+requirementUrl);
-        return {url: requirementUrl, fromUrl: fromUrl, place: urlPlace, preload: preload, name: name, isRoute: isRoute, def:def};
-    }
-
-    // this only adds global js lib requirements currently
-    MapItem.prototype._cogAddRequirement = function(requirementUrl, preload, name, isRoute, def) {
-
-        //console.log('add: '+ requirementUrl);
-        var self = this;
-        var urlPlace = bus.location("n-url:"+requirementUrl);
-        var requirement = {url: requirementUrl, fromUrl: self.resolvedUrl, place: urlPlace, preload: preload, name: name, isRoute: isRoute, def: def};
-
-        self.requirements.push(requirement);
-        self.requirementsSeen[requirement.url] = requirement;
-
-    };
-
-    MapItem.prototype._cogDownloadRequirements = function() {
-
-        var self = this;
-        for(var i = 0; i < self.requirements.length; i++){
-            var r = self.requirements[i];
-            //console.log('try: '+ r.url);
-            tryToDownload(r.url);
-            r.place.on("done").as(self).host(self.uid).run(self._cogRequirementReady).once().autorun();
-        }
-
-    };
-
-
-
-    function tryToDownload(url) {
-
-
-        var urlPlace = bus.location("n-url:"+url);
-        var status = urlPlace.peek("status");
-
-        if(status && (status.msg.active || status.msg.done))
-            return; // already downloading or successfully downloaded
-
-        if(!status) {
-            urlPlace.write({active: true, errors: 0}, "status");
-        } else {
-            var newStatus = {active: true, fail: false, errors: status.msg.errors};
-            urlPlace.write(newStatus, "status");
-        }
-
-        var isHTML = endsWith(url, ".html");
-        var suffix = "?buildNum=" + buildNum;
-
-        //console.log("GO DOWNLOAD: " + url);
-
-        $.ajax({url: url + suffix, dataType: "text"})
-            .done(function(response, status, xhr ){
-
-                //console.log('got file:'+url);
-                urlPlace.write(response);
-
-                if (isHTML)
-                    parser.parseFile(url, response);
-
-                urlPlace.write({active: false, done: true}, "status");
-                urlPlace.write(url, "done");
-
-
-            })
-            .fail(function(x,y,z){
-
-                var status = urlPlace.peek("status");
-                var newStatus = {active: false, fail: true, errors: status.msg.errors + 1};
-                urlPlace.write(newStatus, "status");
-
-            });
-    }
 
     function endsWith(entireStr, ending){
         return (entireStr.lastIndexOf(ending) === (entireStr.length - ending.length) && entireStr.length > ending.length);
@@ -1137,111 +832,11 @@
     }
 
 
-    MapItem.prototype._cogDownloadUrl2 = function (){
-
-        downloader.downloadFiles([this.resolvedUrl]);
-
-        var self = this;
-        var urlPlace = bus.location("n-url:"+ self.resolvedUrl);
-        tryToDownload(self.resolvedUrl);
-        urlPlace.on("done").as(self).host(self.uid).run(self._cogBecomeUrl).once().autorun();
-
-    };
-
-
-    MapItem.prototype._cogDownloadUrl = function (){
-
-        var self = this;
-        var urlPlace = bus.location("n-url:"+ self.resolvedUrl);
-        tryToDownload(self.resolvedUrl);
-        urlPlace.on("done").as(self).host(self.uid).run(self._cogBecomeUrl).once().autorun();
-
-    };
-
     MapItem.prototype.clearContent = function(){
         destroyInnerMapItems(this);
         if(this.localSel){
             console.log('clear issue!!! -- expecting this to be pinion without local content');
-            // this.localSel.empty();
         }
-    };
-
-
-    MapItem.prototype._resolvePath = function(path){
-
-        if(path)
-            path = this.findAlias(path) || path;
-        else
-            path = this._findPath();
-
-        path = (path) ? this._endWithSlash(path) : "/";
-        return path;
-
-    };
-
-    MapItem.prototype._resolveUrl = function(url, path){
-
-        var from = this;
-        url = from.findAlias(url) || url;
-        path = from._resolvePath(path);
-        var raw = (url.indexOf("/")===0 || url.indexOf("http://")===0 || url.indexOf("https://")===0);
-        var full =  (path && !raw) ? path + url : url;
-        if(full.indexOf("..")===-1)
-            return full;
-        return from._collapseRelativePath(full);
-    };
-
-    MapItem.prototype._resolveUrl2 = function(url, path, map){
-
-        var from = this;
-        url = map[url] || url;
-        path = from._resolvePath2(path, map);
-        var raw = (url.indexOf("/")===0 || url.indexOf("http://")===0 || url.indexOf("https://")===0);
-        var full =  (path && !raw) ? path + url : url;
-        if(full.indexOf("..")===-1)
-            return full;
-        return from._collapseRelativePath(full);
-    };
-
-    MapItem.prototype._resolvePath2 = function(path, map){
-
-        var actualPath = (path && map[path]) || path || this.resolvedPath;
-        actualPath = actualPath ? this._endWithSlash(actualPath) : "/";
-        return actualPath;
-
-    };
-
-    MapItem.prototype._collapseRelativePath = function(url){
-
-        var parts = url.split("/");
-        var remnants = [];
-
-        while(parts.length > 0) {
-            var chunk = parts.shift();
-            if(chunk !== ".."){
-                remnants.push(chunk);
-            } else if(remnants.length > 0) {
-                remnants.pop();
-            }
-        }
-        return remnants.join("/");
-
-    };
-
-    MapItem.prototype._endWithSlash = function(str) {
-        var lastChar = str.charAt(str.length-1);
-        if(lastChar === "/") return str;
-        return str + "/";
-    };
-
-    MapItem.prototype._findPath = function(){
-        var item = this;
-        do{
-            if(item.path) // && !item.isAlloy)// && !item.library)
-                return item.path;
-            item = item.parent;
-        } while(item);
-        return undefined;
     };
 
 
@@ -1252,35 +847,11 @@
 
         var mapNames = {
             data: 'dataMap',
-            feed: 'feedMap',
-            service: 'serviceMap',
-            alias: 'aliasMap',
             method: 'methodMap'
         };
 
         var map = mapNames[thing];
         return this._find(name, map, where, optional);
-    };
-
-
-    MapItem.prototype.createAlias = function(def){
-        var url = this.aliasMap[def.name] = this._resolveUrl2(def.url, def.path, this.aliasMap1.map);
-        if(def.prop)
-            this.exposeProp(def.name, url);
-        return url;
-    };
-
-    MapItem.prototype.createValve = function(def){
-
-        var valveMap = this.valveMap = this.valveMap || {dataMap: null, aliasMap: null};
-        var thingKey = def.thing + 'Map';
-        var accessHash = valveMap[thingKey] = valveMap[thingKey] || {};
-        for(var i = 0; i < def.allow.length; i++){
-            var allowKey = def.allow[i];
-            accessHash[allowKey] = true;
-        }
-        return accessHash;
-
     };
 
 
@@ -1292,27 +863,6 @@
         dataPlace.write(def.value);
     };
 
-
-    MapItem.prototype.createFeed = function(def){
-
-        var mi = this;
-        var feed = new Feed();
-        feed.init(def, mi);
-
-        return feed;
-
-    };
-
-
-    MapItem.prototype.createService = function(def){
-
-        var mi = this;
-        var service = new Service();
-        service.init(def, mi);
-
-        return service;
-
-    };
 
     MapItem.prototype.createSensor = function(watch, thing, topic, where){
         thing = thing || 'data';
@@ -1328,14 +878,24 @@
     };
 
     MapItem.prototype._senseInteraction = function(nodeId, eventName){
+
         var self = this;
-        var sel = this.scriptData[nodeId];
-        if (!sel) {
-            self.throwError("Could not detect interaction, missing sel id: " + nodeId);
+
+        var node = self.scriptData[nodeId];
+        if (!node) {
+            self.throwError("Could not detect interaction, missing node id: " + nodeId);
             return;
         }
 
-        return sel.detect(eventName);
+        var data = this.demandData('node:' + nodeId);
+
+        var eventHandler = function(event){
+            data.write(event, eventName);
+        };
+
+        node.on(eventName, eventHandler);
+
+        return data.on(eventName).emit('update');
 
     };
 
@@ -1469,7 +1029,13 @@
     MapItem.prototype.createProp = function(def){
 
         var mi = this;
-        var prop = mi.find(def.find, def.thing, def.where, def.optional);
+        var prop;
+
+        if(def.thing === 'alias'){
+            prop = mi.aliasContext2.resolveUrl(def.find);
+        } else {
+            prop = mi.find(def.find, def.thing, def.where, def.optional);
+        }
 
         if(!prop && def.optional)
             return;
@@ -1612,20 +1178,8 @@
 
     };
 
-    MapItem.prototype.findService = function(name, where){
-        return this._find(name, 'serviceMap', where);
-    };
-
-    MapItem.prototype.findFeed = function(name, where){
-        return this._find(name, 'feedMap', where);
-    };
-
     MapItem.prototype.findData = function(name, where, optional){
         return this._find(name, 'dataMap', where, optional);
-    };
-
-    MapItem.prototype.findAlias = function(name, where){
-        return this._find(name, 'aliasMap', where);
     };
 
     MapItem.prototype.demandData = function(name){
@@ -1659,12 +1213,6 @@
                 return d.read(); // todo  add error handling?
             }
         }
-
-        if(type === FEED)
-            return this.findFeed(value);
-
-        if(type === SERVICE)
-            return this.findService(value);
 
         var context = this.scriptData;
         if(type === PROP)
@@ -1819,93 +1367,6 @@
 
     };
 
-    function extractDefaultFeedDefFromServiceDef(def){
-        return {
-            name: def.name,
-            to: def.to,
-            service: def.name
-        };
-    }
-
-    var Service = function(){
-
-        this._mapItem = null;
-        this._name = null;
-        this._url = null;
-        this._settings = null;
-        this._defaultFeed = null;
-
-    };
-
-    Service.prototype.init = function(def, mi) {
-
-        var service = mi.serviceMap[def.name] = this;
-
-        service._mapItem = mi;
-        service._name = name;
-
-        var resolvedUrl = mi._resolveUrl(def.url, def.path);
-        //var ruu = mi._resolveUrl2(def.url, def.path, mi.aliasMap2.map);
-        var settings = {};
-        settings.type = (def.post) ? 'POST' : 'GET';
-        settings.dataType = def.format;
-        service.url(resolvedUrl).settings(settings);
-
-        // create default feed
-        var feedDef = extractDefaultFeedDefFromServiceDef(def);
-        service._defaultFeed = mi.createFeed(feedDef);
-
-        if(def.run)
-            service.run(def.run);
-
-        if(def.prop)
-            mi.exposeProp(def.name, service);
-
-        if(def.request)
-            service.request();
-
-        return service;
-
-    };
-
-
-    Service.prototype.name = function(){
-        return this._name;
-    };
-
-
-    Service.prototype.url = function(url){
-        if(arguments.length==0) return this._url;
-        this._url = url;
-        return this;
-    };
-
-    Service.prototype.settings = function(settings){
-        if(arguments.length==0) return this._settings;
-        this._settings = settings;
-        return this;
-    };
-
-    Service.prototype.to = Service.prototype.data = function(dataPlace) {
-        return this._defaultFeed.to(dataPlace);
-    };
-
-    Service.prototype.req = Service.prototype.request = function() {
-        return this._defaultFeed.request();
-    };
-
-    Service.prototype.run = function(callbackName){
-        console.log("NOT READY!!!!!");
-    };
-
-    Service.prototype.params = function(params) {
-        return this._defaultFeed.params(params);
-    };
-
-    Service.prototype.parse = function(parseFunc) {
-        return this._defaultFeed.parse(parseFunc);
-    };
-
 
     var WebService = function() {
 
@@ -1965,8 +1426,9 @@
         var defaults = copyProps(webServiceDefaults, {});
         settings = copyProps(settings, defaults); // override defaults
 
-        settings.resolvedUrl = this._cog._resolveUrl(settings.url, settings.path);
-        //var huu = this._cog._resolveUrl2(settings.url, settings.path, this._cog.aliasMap2.map);
+        settings.resolvedUrl = this._cog.aliasContext2.resolveUrl(settings.url, settings.path);
+
+
         this._settings = settings;
 
         return this;
@@ -2061,156 +1523,6 @@
         ;
         return self;
     };
-
-
-    var Feed = function() {
-
-        this._mapItem = null;
-        this._name = null;
-        this._service = null;
-        this._feedPlace = null;
-        this._dataPlace = null;
-        this._params = null;
-        this._primed = false;
-        this._uid = ++uid;
-
-    };
-
-    Feed.prototype.init = function(def, mi){
-
-        var feed = mi.feedMap[def.name] = this;
-        var service = feed._service = mi.findService(def.service);
-
-        var dataName = def.to || def.service;
-
-        feed._mapItem = mi;
-        feed._name = def.name;
-        feed._feedPlace = bus.location("n-feed:" + mi.uid + ":"+ def.name);
-        feed._dataPlace = mi.demandData(dataName);
-        feed._params = null;
-        feed._primed = false; // once a request is made, executed on next js frame to allow easy batching, avoid multiple calls
-
-        if(def.prop) {
-            mi.exposeProp(def.name, feed);
-            if(dataName !== def.name)
-                mi.exposeProp(dataName, feed._dataPlace);
-        }
-
-        if(def.request)
-            feed.request();
-
-    };
-
-    Feed.prototype.on = function(name){
-        return this._feedPlace.on(name);
-    };
-
-
-
-    Feed.prototype.to = Feed.prototype.data = function(dataPlace){
-        if(arguments.length==0) return this._dataPlace;
-        // todo if changing target, fire feed.detach event
-        if(!dataPlace && this._name){
-            // TODO is this old format and broken???
-            dataPlace = this.mapItem.createData(this._name); // create data named after the feed
-        }
-
-        if((typeof dataPlace) === 'string')
-            dataPlace = this.mapItem.findData(dataPlace);
-
-        if(!dataPlace){
-            console.log("INVALID DATA pointed to by feed!");
-            return null;
-        }
-        this._dataPlace = dataPlace;
-        this._dataPlace.write(this,"attach");
-        return this._dataPlace;
-    };
-
-    Feed.prototype.params = function(params){
-        if(arguments.length==0) return this._params;
-        this._params = params;
-        //this._determineParamsKey();
-        return this;
-    };
-
-    Feed.prototype.parse = function(parseFunc){
-        // TODO if not typeof func, error
-        this._parse = parseFunc;
-        return this;
-    };
-
-    function createResponseInfo(){
-        return {
-            response: null,
-            status: null,
-            xhr: null,
-            error: null,
-            feed: null,
-            parsed: null
-        };
-    }
-
-    Feed.prototype.req = Feed.prototype.request = function(){
-        if(!this._primed){
-            this._primed = true;
-            setTimeout(this._runRequest.bind(this),0);
-        }
-        return this;
-    };
-
-    Feed.prototype._runRequest = function(){
-
-        var self = this;
-        self._primed = false;
-
-        // abort any prior running request using this feed object
-        var running = self._xhr && self._xhr.readyState && self._xhr.readyState != 4;
-        if(running) {
-            self._xhr.abort();
-        }
-
-        var info = createResponseInfo();
-        info.params = self._params;
-        info.feed = self;
-
-        self._feedPlace.write(info, "request");
-        if(self._dataPlace)
-            self._dataPlace.write(info, "request");
-
-        var settings = self._service._settings;
-        settings.data = self._params;
-        settings.url = self._service._url;
-
-        self._xhr = $.ajax(settings)
-            .done(function(response, status, xhr ){
-                info.response = response;
-                info.parsed = (self._parse) ? self._parse(response) : response;
-                info.status = status;
-                info.xhr = xhr;
-                info.error = null;
-
-                self._feedPlace.write(info, "done");
-                self._feedPlace.write(info, "always");
-                if(self._dataPlace)
-                    self._dataPlace.write(info.parsed);
-
-            })
-            .fail(function(xhr, status, error){
-                info.response = null;
-                info.status = status;
-                info.xhr = xhr;
-                info.error = error;
-                self._feedPlace.write(info, "fail");
-                self._feedPlace.write(info, "always");
-                if(self._dataPlace)
-                    self._dataPlace.write(info, "error");
-            })
-        ;
-        return self;
-    };
-
-
 
 
 })(jQuery, window);

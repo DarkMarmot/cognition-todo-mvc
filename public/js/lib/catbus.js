@@ -1,5 +1,5 @@
 /**
- * catbus.js (v2.2.1)
+ * catbus.js (v2.3)
  *
  * Copyright (c) 2015 Scott Southworth, Landon Barnickle & Contributors
  *
@@ -21,6 +21,16 @@
     "use strict";
 
     var catbus = {};
+    var externalContext = this;
+
+    catbus.$ = {};
+
+    var plugins = typeof seele !== 'undefined' && seele;
+    if(plugins)
+        plugins.register('catbus', catbus, true);
+    else
+        externalContext.Catbus = catbus;
+
 
     function createQueueFrame() {
         return  {defer:[], batch:[], batchAndDefer:[]};
@@ -458,6 +468,8 @@
     };
 
     Zone.prototype._findData = function(name, where, optional) {
+
+        where = where || 'first';
 
         var container_name = null;
         var result = null;
@@ -1616,39 +1628,6 @@
 
 
 
-    catbus.$ = {};
 
-    catbus.$.detect = function(eventName) {
-
-        var sensor = catbus.sensor();
-
-        this.on(eventName, function(event){
-            sensor.tell(event, 'update', eventName);
-        });
-
-        return sensor;
-
-    };
-
-    var plugins = typeof seele !== 'undefined' && seele;
-    if(plugins)
-        plugins.register('catbus', catbus, true);
-
-    var selector = typeof jQuery !== 'undefined' && jQuery !== null ? jQuery : null;
-    selector = selector || (typeof Zepto !== 'undefined' && Zepto !== null ? Zepto : null);
-    if(selector)
-        selector.fn.detect = catbus.$.detect;
-
-    if ((typeof define !== "undefined" && define !== null) && (define.amd != null)) {
-        define([], function() {
-            return catbus;
-        });
-        this.catbus = catbus;
-    } else if ((typeof module !== "undefined" && module !== null) && (module.exports != null)) {
-        module.exports = catbus;
-        catbus.catbus = catbus;
-    } else {
-        this.catbus = catbus;
-    }
 
 }).call(this);
