@@ -254,8 +254,6 @@
         decs.valves = [].concat(getDefs2(sel.valve, extractValveDef2));
         decs.dataSources = [].concat(getDefs2(sel.data, extractDataDef2));
         decs.dataSources = decs.dataSources.concat(getDefs2(sel.net, extractNetDef2));
-        decs.services = [].concat(getDefs2(sel.service, extractServiceDef2));
-        decs.feeds = [].concat(getDefs2(sel.feed, extractFeedDef2));
         decs.methods = [].concat(getDefs2(sel.method, extractMethodDef2));
         decs.properties = [].concat(getDefs2(sel.prop, extractPropDef2));
         decs.sensors = [].concat(getDefs2(sel.sensor, extractSensorDef2));
@@ -272,14 +270,22 @@
         decs.cogs = [].concat(getDefs2(sel.cog, extractCogDef2));
         decs.chains = [].concat(getDefs2(sel.chain, extractChainDef2));
         decs.requires = [].concat(getDefs2(sel.require, extractLibraryDef2, true));
-        decs.alloys = [].concat(getDefs2(sel.hoist, extractAlloyDef2));
         decs.alloys = [].concat(getDefs2(sel.alloy, extractAlloyDef2));
         decs.requires = decs.requires.concat(getDefs2(sel.preload, extractPreloadDef2, true));
         decs.requires = decs.requires.concat(decs.alloys);
         return decs;
     }
 
+    function extractAliasDef2(node){
 
+        return {
+            name: extractString2(node, 'name'),
+            path: extractString2(node, 'path'),
+            url: extractString2(node, 'url'),
+            prop: extractBool2(node, 'prop')
+        };
+
+    }
 
 
     function extractCommandDef2(node){
@@ -314,6 +320,7 @@
         };
 
         d.watch = [d.name];
+        d.cmd = d.name;
 
         // gather needs and cmd -- only trigger on cmd
         if(d.gather.length || d.need.length) {
@@ -338,7 +345,6 @@
 
     }
 
-
     function extractSensorDef2(node){
 
         var d = {
@@ -352,7 +358,7 @@
             optional: extractBool2(node, 'optional'),
             where: extractString2(node, 'from,where', 'first'),
             pipeWhere: extractString2(node, 'to', 'first'),
-            thing: extractString2(node, 'is', 'data'), // data, feed, service
+            thing: extractString2(node, 'is', 'data'), // data, read, alias
             pipe: extractString2(node, 'pipe'),
             toggle: extractString2(node, 'toggle'),
             demand: extractString2(node, 'demand'),
@@ -422,7 +428,6 @@
 
     }
 
-
     function extractPropDef2(node){
 
         var d = {
@@ -438,7 +443,6 @@
 
     }
 
-
     function extractWriteDef2(node){
         return {
             name: extractString2(node, 'name'),
@@ -447,7 +451,6 @@
             value: extractString2(node, 'value')
         };
     }
-
 
     function extractAdapterDef2(node){
 
@@ -470,7 +473,6 @@
         return d;
     }
 
-
     function extractValveDef2(node){
         return {
             allow: extractStringArray2(node, 'allow'),
@@ -491,7 +493,6 @@
         };
     }
 
-
     function extractPreloadDef2(node){
         return {
             name: null,
@@ -504,7 +505,6 @@
             preload: true
         };
     }
-
 
     function extractAlloyDef2(node){
 
@@ -527,31 +527,6 @@
         return d;
     }
 
-
-
-    function extractServiceDef2(node){
-
-        var d = {
-            name: extractString2(node, 'name'),
-            to: extractString2(node, 'to'),
-            url: extractString2(node, 'url'),
-            path: extractString2(node, 'path'),
-            topic: extractString2(node, 'on,topic'),
-            run: extractString2(node, 'run'),
-            post: extractBool2(node, 'post'),
-            format: extractString2(node, 'format', 'jsonp'),
-            request: extractBool2(node, 'req,request'),
-            prop: extractBool2(node, 'prop')
-        };
-
-
-        return d;
-
-    }
-
-
-
-
     function extractCogDef2(node){
 
         var d = {
@@ -562,7 +537,7 @@
             url: extractString2(node, "url"),
             source: extractString2(node, 'use') || extractString2(node, 'from,source'),
             item: extractString2(node, 'make') || extractString2(node, 'to,item','cog'),
-            target: extractString2(node, "id,find")
+            target: extractString2(node, "node,id,find")
 
         };
 
@@ -581,7 +556,6 @@
             name: extractString2(node, "name"),
             isRoute: extractBool2(node, "route"),
             url: extractString2(node, "url"),
-            prop: extractBool2(node, 'prop'),
             source: extractString2(node, "from,source"),
             item: extractString2(node, "to,value,item",'cog'),
             key: extractString2(node, "key"),
@@ -598,25 +572,6 @@
         return d;
 
     }
-
-
-
-    function extractFeedDef2(node){
-
-        var d = {
-            service: extractString2(node, 'service'),
-            to: extractString2(node, 'to,data'), // todo decide on to or data
-            request: extractBool2(node, 'req,request'),// todo change to extractBool and test
-            name: extractString2(node, 'name', false),
-            prop: extractBool2(node, 'prop', false)
-        };
-
-        d.name = d.name || d.service;
-
-        return d;
-
-    }
-
 
     function extractDataDef2(node){
 
@@ -651,7 +606,6 @@
         return d;
 
     }
-
 
     function extractNetDef2(node){
 
@@ -741,19 +695,6 @@
 
     }
 
-
-    function extractAliasDef2(node){
-
-        return {
-            name: extractString2(node, 'name'),
-            path: extractString2(node, 'path'),
-            url: extractString2(node, 'url'),
-            prop: extractBool2(node, 'prop')
-        };
-
-    }
-
-
     function extractMethodDef2(node){
 
         var d = {
@@ -768,13 +709,9 @@
         return d;
     }
 
-
-
-
     function extractHasAttr2(node, attrName){
         return !!(node && node.attributes.getNamedItem(attrName));
     }
-
 
     function extractString2(node, attrNameOrNames, defaultValue){
 
@@ -784,7 +721,6 @@
         return defaultValue;
 
     }
-
 
     function extractBool2(node, attrNameOrNames, defaultValue){
 
@@ -800,8 +736,6 @@
         throwParseError(node, 'bool', attrNameOrNames);
 
     }
-
-
 
     function extractStringArray2(node, attrNameOrNames){
 

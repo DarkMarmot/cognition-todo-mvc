@@ -1,5 +1,7 @@
 ;(function REI() {
 
+    // tiny soulless meat computer
+
     var Rei = function(domish){  // element, node, Rei, fragment or array-like (to fragment)
         if(domish._dom)
             return domish; // Rei returns itself if duck-wrapped
@@ -25,8 +27,6 @@
     Rei.prototype.rawContent = Rei.prototype.raw = function(){
         return this[0];
     };
-
-
 
     Rei.prototype._fromDom = function(domish){
 

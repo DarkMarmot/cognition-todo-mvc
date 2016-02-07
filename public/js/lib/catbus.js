@@ -1257,7 +1257,7 @@
 
         for(var i = 0; i < this._gather.length; i++){
             var name = this._gather[i];
-            var data = zone._findData(name);
+            var data = zone._findData(name, 'first', optional);
             if(data){
                 consolidated[name] = data.read();
             }

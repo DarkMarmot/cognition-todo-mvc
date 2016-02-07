@@ -136,7 +136,6 @@
         mapItem.parent = null;
 
         mapItem.destroyed = true;
-        mapItem.requirements = null;
 
         var stored = contentMap[mapItem.uid];
         if(stored === mapItem) {
