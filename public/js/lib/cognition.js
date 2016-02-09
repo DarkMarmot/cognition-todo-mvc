@@ -1,7 +1,7 @@
 ;(function($, window) {
 
     /**
-     * cognition.js (v2.0.1-arg)
+     * cognition.js (v2.1.0-arg)
      *
      * Copyright (c) 2015 Scott Southworth, Landon Barnickle, Nick Lorenson & Contributors
      *
@@ -107,10 +107,26 @@
 
     function destroyMapItem(mapItem){
 
-        for(var k in mapItem.childMap){
+
+
+        //if(!mapItem.isAlloy) {
+        //
+        //    for(var i = 0; i < mapItem.alloys.length; i++){
+        //        var alloy = mapItem.alloys[i];
+        //        destroyMapItem(alloy);
+        //    }
+
+        for (var k in mapItem.childMap) {
             var mi = mapItem.childMap[k];
             destroyMapItem(mi);
         }
+        //}
+
+        //for (var i = 0; i < mapItem.alloys.length; i++){
+        //    var alloy = mapItem.alloys[i];
+        //    destroyMapItem(alloy);
+        //}
+
 
         if(!mapItem.scriptData)
             console.log("what?");
@@ -254,19 +270,7 @@
 
     };
 
-    MapItem.prototype._determineAlloys = function(){
 
-        var cog = this.parent;
-        var alloys = [];
-
-        while (cog && cog.isAlloy){
-            alloys.unshift(cog);
-            cog = cog.parent;
-        }
-
-        this.alloys = alloys;
-
-    };
 
     MapItem.prototype._exposeAlloys = function(){
 
@@ -328,7 +332,8 @@
         var mi = new MapItem();
 
         mi.cogZone = self.cogZone.demandChild();
-        mi.url = url;
+        //mi.url = url;
+        mi.url = mi.resolvedUrl = url;
         mi.itemData = data;
         mi.itemKey = key;
         mi.itemOrder = index;
@@ -339,7 +344,7 @@
 
         mi.url = self._resolveValueFromType(mi.url, mi.urlType);
 
-      //  console.log('LINK:', mi.url, mi.urlType);
+        //  console.log('LINK:', mi.url, mi.urlType);
 
         mi.resolvedUrl = self.aliasContext3.resolveUrl(mi.url);
 
@@ -373,7 +378,7 @@
         mi.url =  def.url;
         mi.urlType = def.urlType || 'string';
 
-    //    console.log('COG:', mi.url, mi.urlType);
+        //    console.log('COG:', mi.url, mi.urlType);
 
         mi.parent = self;
 
@@ -440,7 +445,7 @@
 
         mi.aliasContext0 = mi.aliasContext1 = mi.aliasContext2 = mi.aliasContext3 = self.aliasContext3;
 
-        var resolvedUrl = mi.aliasContext0.resolveUrl(def.url);
+        var resolvedUrl = mi.resolvedUrl = mi.aliasContext0.resolveUrl(def.url);
         downloader.downloadFiles(resolvedUrl, mi._seekListSource.bind(mi));
 
         return mi;
@@ -602,7 +607,7 @@
         var childMap = this.childMap;
         for(var id in childMap){
             var mi = childMap[id];
-            var itemKey = mi.itemKey;
+            var itemKey = mi.isAlloy ? mi.origin.itemKey : mi.itemKey;
             keyMap[itemKey] = mi;
         }
 
@@ -614,7 +619,8 @@
 
     MapItem.prototype._refreshListItems = function(arr){
 
-        var url = this.url;
+        //var url = this.url;
+        var url = this.resolvedUrl;
         var listKey = this.listKey;
 
         var i;
@@ -631,8 +637,10 @@
             var itemKey = (listKey) ? d[listKey] : i; // use index if key not defined
             listItem = remnantKeyMap[itemKey]; // grab existing item if key used before
 
+
             if(listItem) { // already exists
-                listItem.itemDataLoc.write(d);
+                var displayItem = listItem.isAlloy ? listItem.origin : listItem;
+                displayItem.itemDataLoc.write(d);
             } else {
                 listItem = this.createLink(url, itemDataName, d, i, itemKey);
             }
@@ -728,6 +736,7 @@
             var def = alloys[i];
             def.url = def.resolvedUrl; // todo remove hack?
             var alloy = this.createAlloy(def);
+            this.alloys.push(alloy);
             this.aliasContext2 = this.aliasContext2.addContext(alloy.aliasContext1);
 
         }
@@ -755,11 +764,11 @@
 
         downloader.downloadFiles(files, function(status){
 
-           if(status === 'ready') {
-               self._cogPreInitialize();
-           }
-           else
-               console.log(self.resolvedUrl + ' failed to load stuff');
+            if(status === 'ready') {
+                self._cogPreInitialize();
+            }
+            else
+                console.log(self.resolvedUrl + ' failed to load stuff');
 
         });
 
@@ -771,10 +780,8 @@
         var mi = this;
 
         if(!mi.isAlloy) {
-            mi._determineAlloys();
             mi._exposeAlloys();
         }
-
 
         if(mi.placeholder){
             mi.placeholder.replaceWith(mi.display);

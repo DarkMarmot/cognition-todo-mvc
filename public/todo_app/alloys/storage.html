@@ -30,6 +30,8 @@
 
     $.cog({
 
+        uid: 0,
+
         methodGet: {method: 'get'},
 
         LOCAL_STORAGE_NAME: "todo_mvc_cognition",
@@ -74,7 +76,8 @@
 
         createTodo: function (msg) {
 
-            var todo = {text: msg.cmd_CreateTodo, completed: false};
+            var id = ++this.uid;
+            var todo = {text: msg.cmd_CreateTodo, completed: false, id: id};
             msg.storage.push(todo);
             return msg.storage;
 
