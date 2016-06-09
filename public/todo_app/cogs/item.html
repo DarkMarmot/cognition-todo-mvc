@@ -1,17 +1,13 @@
 
 <blueprint>
 
-    <alloy name="meow" url="meow.html" />
-    <alloy name="poop" url="meow.html" />
-
     <data name="itemRenderer" url="itemView.html" />
     <data name="editing" value="false" />
 
     <sensor watch="editing" transform="toUrl" pipe="itemRenderer" />
     <sensor watch="item,editing" run="render" />
 
-    <sensor watch="cat" run="log" />
-    <cog find="listItem" url="data itemRenderer" />
+    <cog node="listItem" url="data itemRenderer" />
 
 </blueprint>
 
@@ -29,12 +25,7 @@
 
     $.cog({
 
-        log: function(msg){
-            console.log('meow all',msg);
-        },
-        destroy: function(){
-            console.log('boom',this.mapItem);
-        },
+
         toUrl: function(msg){
             return msg ? 'itemEdit.html' : 'itemView.html';
         },
