@@ -117,8 +117,13 @@
     }
 
 
-    ohmu.cacheBuster = function cacheBuster(uniqueString){
-        suffixOnRequests = uniqueString;
+    ohmu.cacheBuster = function cacheBuster(appName, uniqueString){
+        if (!uniqueString) {
+            uniqueString = appName;
+            appName = "cognition-app";
+        }
+
+        suffixOnRequests = '?' + appName + '=' + uniqueString;
     };
 
 

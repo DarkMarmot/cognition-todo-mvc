@@ -1,3 +1,5 @@
+// version 1.5.0
+
 ;(function REI() {
 
     // tiny soulless meat computer
@@ -83,6 +85,16 @@
             arr = [raw];
         }
         return arr;
+    };
+
+    Rei.prototype.reparent = function(){
+
+
+        var child = this.raw();
+        var parent = child.parentNode;
+        parent.appendChild(child);
+
+        return this;
     };
 
 

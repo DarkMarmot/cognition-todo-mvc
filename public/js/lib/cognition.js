@@ -1,7 +1,7 @@
 ;(function($, window) {
 
     /**
-     * cognition.js (v2.1.0-arg)
+     * cognition.js (v2.3 templates and gather fix)
      *
      * Copyright (c) 2015 Scott Southworth, Landon Barnickle, Nick Lorenson & Contributors
      *
@@ -34,6 +34,7 @@
     var COG_ROOT = bus.demandTree('COG_ROOT');
 
     var buildNum = 'NEED_BUILD_NUM';
+    downloader.cacheBuster("app_version", buildNum);
 
     // cognition data types
 
@@ -47,6 +48,13 @@
     var READ = 'read';
 
 
+    // TODO merge note - this should be?
+    var webServiceDefaults = {};
+
+    cognition.netDefaults = function netDefaults (defaults) {
+        webServiceDefaults = copyProps(defaults, webServiceDefaults);
+    };
+
     cognition.buildNum = function(n){
         if(arguments.length == 0) return buildNum;
         buildNum = n;
@@ -55,14 +63,6 @@
 
     var contentMap = {}; // layout map, built from n-item hierarchy
     var libraryMap = {}; // by resolvedUrl, javascript files processed (don't run again)
-
-
-    var webServiceDefaults = {
-
-        format: 'jsonp',
-        post: false
-
-    };
 
     function destroyInnerMapItems(into){
         for(var k in into.childMap){
@@ -186,6 +186,10 @@
         this.methodMap = {};
         this.childMap = {};
         this.webServiceMap = {};
+        this.sockMap = {};
+
+        this.order = false; // for chains
+        this.listKey = null;
 
         this.uid = ++uid;
         this.destroyed = false;
@@ -247,7 +251,7 @@
         {name: 'adapters', method: 'createAdapter'},
         {name: 'dataSources', method: 'createData'},
         {name: 'commands', method: 'demandData'},
-        {name: 'methods', method: 'createMethod'}
+        {name: 'methods', method: 'createMethod'},
 
     ];
 
@@ -298,9 +302,9 @@
         if(defs)
             self._cogFirstBuildDeclarations(defs);
 
-
         self.scriptData.init();
 
+      //  self.doTemplateBindings();
 
         if(defs) {
 
@@ -319,9 +323,7 @@
             });
         }
 
-
         self.scriptData.start();
-
 
     };
 
@@ -393,6 +395,7 @@
 
             if(!placeholder) {
 
+                // if not target node, todo throw error in cog creation stuff to say node not present in template
                 mi.placeholder = getPlaceholderDiv();
                 mi.targetNode = (self.isPinion) ? self.targetNode : self.scriptData[mi.target];
                 mi.targetNode.append(mi.placeholder);
@@ -593,6 +596,8 @@
 
     MapItem.prototype._seekListSource = function(){
 
+        if(this.destroyed || !this.parent || this.parent.destroyed) return;
+
         if(this.source){
             this._resolveSource();
         } else {
@@ -619,7 +624,7 @@
 
     MapItem.prototype._refreshListItems = function(arr){
 
-        //var url = this.url;
+
         var url = this.resolvedUrl;
         var listKey = this.listKey;
 
@@ -637,12 +642,20 @@
             var itemKey = (listKey) ? d[listKey] : i; // use index if key not defined
             listItem = remnantKeyMap[itemKey]; // grab existing item if key used before
 
-
+            var displayItem;
             if(listItem) { // already exists
-                var displayItem = listItem.isAlloy ? listItem.origin : listItem;
+                displayItem = listItem.isAlloy ? listItem.origin : listItem;
                 displayItem.itemDataLoc.write(d);
             } else {
                 listItem = this.createLink(url, itemDataName, d, i, itemKey);
+                displayItem = listItem.isAlloy ? listItem.origin : listItem;
+            }
+
+            //if(this.order)
+                //this.parent.localSel.append(displayItem.localSel);
+
+            if(this.order) {
+                displayItem.localSel.reparent();
             }
 
             dataKeyMap[itemKey] = listItem;
@@ -654,7 +667,6 @@
             if(!dataKeyMap[oldKey])
                 destroyMapItem(listItem);
         }
-
 
     };
 
@@ -679,7 +691,18 @@
         sd.index = mi.itemOrder;
         sd.key = mi.itemKey;
 
+        mi._templates = parser.templates(url);
+        mi._boundNodes = {};
+
         mi.aliasContext1 = resolver.resolveAliasContext(mi.resolvedUrl, mi.aliasContext0, mi._declarationDefs.aliases);
+
+        // expose aliases to scriptData -- todo make this look nicer and use functions
+        for(var j = 0; j < mi._declarationDefs.aliases.length; j++){
+            var aliasDef = mi._declarationDefs.aliases[j];
+            if(aliasDef.prop)
+                sd[aliasDef.name] = mi.aliasContext1.aliasMap.map[aliasDef.name];
+        }
+
         mi.aliasContext2 = mi.aliasContext1; // later modified if alloys contain aliases
 
         if(mi.isAlloy) {
@@ -689,6 +712,11 @@
             var nodes = display.querySelectorAll('[id]');
             for(var i = 0; i < nodes.length; i++){
                 var node = nodes[i];
+
+                if (mi._templates[node.id]) {
+                    mi._boundNodes[node.id] = node;
+                }
+
                 var cameCaseName = camelCase(node.id);
                 sd[cameCaseName] = dom(node);
                 node.setAttribute('id', mi.uid + '_' + cameCaseName);
@@ -711,6 +739,8 @@
     };
 
     MapItem.prototype._cogPreInitialize = function(){
+
+        if(this.destroyed || !this.parent || this.parent.destroyed) return;
 
         var requirements = this._declarationDefs.requires;
 
@@ -929,6 +959,8 @@
             sensor = dataPlace.on(def.topic);
 
         }
+
+        sensor.zone(mi.cogZone);
 
         var context = mi.scriptData;
 
@@ -1166,6 +1198,17 @@
 
     };
 
+
+    MapItem.prototype.doTemplateBindings = function doTemplateBindings (defs) {
+        var nodes = this._boundNodes;
+        var syntaxPlans = this._templates;
+
+        // null is passed as the context since this function _is already bound_
+        // and one can't overwrite the `this` of a function on which `bind` has
+        // already been called
+        for (var key in syntaxPlans) this.scriptData["_templateBinding_" + key].call(null, this);
+    };
+
     MapItem.prototype.createMethod = function(def){
 
         var mi = this;
@@ -1258,13 +1301,15 @@
 
         var externalData = z.findData(externalName, 'parent', def.optional); // name of data point to follow or control
 
+        if(def.control && !externalData && def.bypass)
+            externalData = z.demandData(def.bypass);
+
         if(!externalData) return;
 
-
         if(def.control){
-            data.on('*').pipe(externalData);
+            data.on('*').host(this.uid).pipe(externalData);
         } else {
-            externalData.on('*').pipe(data).autorun();
+            externalData.on('*').host(this.uid).pipe(data).autorun();
         }
 
     };
@@ -1294,8 +1339,19 @@
         if (!inherited)
             value = this._resolveValueFromType(value, type);
 
+        var ghostData;
+
+        if(def.isGhost) { // ghost data only creates a prop (ghost) of an existing point, unless it does not exist
+            ghostData = self.cogZone.findData(name, 'first', true);
+            if(ghostData){
+                if(self.scriptData[def.name])
+                    self.throwError("Property already defined: " + def.name);
+                self.scriptData[def.name] = ghostData;
+                return;
+            }
+        }
+
         var data = self.cogZone.demandData(name);
-        //var data = self.dataMap[name] = bus.location("n-data:"+self.uid+":"+name);
 
         if(def.prop){
             if(self.scriptData[def.name])
@@ -1343,6 +1399,18 @@
 
         }
 
+        if (def.socket) {
+
+            var settings = this._resolveValueFromType(def.socket, def.socketType);
+
+            if (settings === void 0)
+                throw new Error("Sockets must come equiped with settings")
+
+            var sock = new WSocket(settings, self, data);
+
+            self.sockMap[data._id] = sock;
+        }
+
         return data;
 
     };
@@ -1374,13 +1442,24 @@
     };
 
 
+    var WSocket = function WSocket (settings, cog, location) {
+        this._cog = cog;
+        this._location = location;
+        this.settings = settings;
+
+        cognition.plugins.use("tachikoma", this._location);
+    }
+
+    WSocket.prototype.send = function send (msg) {
+        this._location.write(msg, "send");
+    }
+
     var WebService = function() {
 
         this._cog = null;
         this._settings = {url: null, params: null, format: 'jsonp', verb: 'GET'};
         this._location = null;
         this._primed = false;
-        this._xhr = null;
         this._timeoutId = null;
 
     };
@@ -1396,22 +1475,37 @@
 
         this._location = location;
 
-        location.on('settings,inline_settings').host(cog.uid).batch().merge('*').batch().group(function(msg,topic){return topic;}).retain().
-            transform(function(msg){return overrideSettings(msg.settings, msg.inline_settings)}).emit('mixed_settings').pipe(location);
+        cognition.plugins.use("ajax", this._location);
 
-        location.on('mixed_settings').host(cog.uid).batch()
-            .filter(function(msg){return msg && msg.request;}).transform(function(){ return {}}).emit('request').pipe(location);
+        location.on('settings,inline_settings')
+            .host(cog.uid)
+            .batch()
+            .merge('*')
+            .batch()
+            .group(function(msg,topic){return topic;})
+            .retain()
+            .transform(function(msg){return overrideSettings(msg.settings, msg.inline_settings)})
+            .emit('mixed_settings')
+            .pipe(location);
 
-        location.on('request').host(cog.uid).transform(
+        location.on('mixed_settings')
+            .host(cog.uid)
+            .batch()
+            .filter(function(msg){return msg && msg.request;})
+            .transform(function(){ return {}})
+            .emit('request')
+            .pipe(location);
 
-            function(msg){
+        location.on('request')
+            .host(cog.uid)
+            .transform(function(msg){
                 var request_settings = (typeof msg === 'object') ? msg : {};
                 var mixed_settings = location.read('mixed_settings');
                 var final_settings = overrideSettings(mixed_settings, request_settings);
                 return final_settings;
-            }).emit('do_request').pipe(location);
-
-        location.on('request').batch().run(function(msg){console.log('REQUEST SETTINGS:', msg);});
+            })
+            .emit('do_request')
+            .pipe(location);
 
         this._cog = cog;
         this.settings(settings);
@@ -1423,8 +1517,7 @@
 
     WebService.prototype.settings = function(settings) {
 
-
-        if(arguments.length==0)
+        if(arguments.length === 0)
             return this._settings; // todo copy and freeze object to avoid outside mods?
 
         this.abort();
@@ -1433,7 +1526,6 @@
         settings = copyProps(settings, defaults); // override defaults
 
         settings.resolvedUrl = this._cog.aliasContext2.resolveUrl(settings.url, settings.path);
-
 
         this._settings = settings;
 
@@ -1449,25 +1541,15 @@
             this._timeoutId = null;
         }
 
-        if(this.isActive()){
-            this._xhr.abort();
-            this._location.write(this._settings, 'abort');
-        }
+        this._location.write(this._settings, 'abort');
 
         return this;
 
     };
 
-    WebService.prototype.isActive = function(){
-
-        return this._xhr && this._xhr.readyState && this._xhr.readyState != 4;
-
-    };
-
-
     WebService.prototype.params = function(params) {
 
-        if(arguments.length==0)
+        if(arguments.length === 0)
             return this._settings.params; // todo copy and freeze objects to avoid outside mods?
 
         this.abort();
@@ -1493,42 +1575,15 @@
 
     WebService.prototype._runRequest = function(){
 
-        var self = this;
-        self._primed = false;
+        this._primed = false;
+        this.abort();
 
-        self.abort(); // this should not be needed, possible sanity check
+        this._location.write(this._settings, 'request');
 
-        self._location.write(self._settings, 'request');
-        self._location.write('busy', 'condition');
+        this._location.write('busy', 'condition');
 
-        var settings = {};
+        return this;
 
-        settings.data = self._settings.params;
-        settings.url = self._settings.resolvedUrl;
-        settings.type = self._settings.verb || 'GET';
-        settings.dataType = self._settings.format;
-
-        self._xhr = $.ajax(settings)
-            .done(function(response, status, xhr ){
-
-                self._location.write(response);
-                self._location.write(response, 'done');
-                self._location.write(response, 'always');
-                self._location.write(status, 'status');
-                self._location.write('done', 'condition');
-
-            })
-            .fail(function(xhr, status, error){
-
-                self._location.write(error, 'error');
-                self._location.write(error, 'always');
-                self._location.write(status, 'status');
-                self._location.write('error', 'condition');
-
-            })
-        ;
-        return self;
     };
-
 
 })(jQuery, window);

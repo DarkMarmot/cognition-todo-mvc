@@ -1,9 +1,15 @@
+/* jshint node: false, esversion: 6 */
+// version 1.6.0 -- templates only on prototype
+
 ;(function VASH(context) {
+    "use strict";
+
+    // adding 'ghost' attribute
 
     var Vash = {};
 
     var plugins = typeof seele !== 'undefined' && seele;
-    if(plugins)
+    if (plugins)
         plugins.register('vash', Vash, true);
     else
         context.Vash = Vash; // bind to outer context
@@ -15,6 +21,7 @@
     var blueprintMap = {};
     var displayMap = {};
     var scriptMap = {};
+    var templateMap = {};
 
     var defaultScriptDataPrototype = {
 
@@ -59,25 +66,28 @@
     var rxhtmlTag = /<(?!area|br|col|embed|hr|img|input|link|meta|param)(([\w:]+)[^>]*)\/>/gi;
 
 
-    Vash.hasFile = function(url){
+    Vash.hasFile = function (url) {
         return blueprintMap.hasOwnProperty(url);
     };
 
-    Vash.blueprint = function(url){
+    Vash.blueprint = function (url) {
         return blueprintMap[url];
     };
 
-    Vash.script = function(url){
+    Vash.script = function (url) {
 
         var script = scriptMap[url] || defaultScriptDataPrototype;
         return Object.create(script);
 
     };
 
-    Vash.display = function(url){
+    Vash.display = function (url) {
         return displayMap[url];
     };
 
+    Vash.templates = function (url) {
+        return templateMap[url];
+    };
 
     function buildFragment(str) {
 
@@ -87,9 +97,9 @@
 
         tmp = fragment.appendChild(document.createElement("div"));
 
-        tmp.innerHTML = str.replace(rxhtmlTag, "<$1></$2>") ;
+        tmp.innerHTML = str.replace(rxhtmlTag, "<$1></$2>");
 
-        for(i = 0; i < tmp.childNodes.length; i++) {
+        for (i = 0; i < tmp.childNodes.length; i++) {
             nodes.push(tmp.childNodes[i]);
         }
 
@@ -105,17 +115,17 @@
         return fragment;
     }
 
-    function childNodesByName(node){
+    function childNodesByName(node) {
 
         var result = {};
-        if(!node)
+        if (!node)
             return result;
 
         var children = node.childNodes;
         var i = 0;
         var n;
 
-        while((n = children[i++])){
+        while ((n = children[i++])) {
             var tag = n.localName;
             var arr = result[tag] = result[tag] || [];
             arr.push(n);
@@ -124,27 +134,41 @@
         return result;
     }
 
-    function unwrapDisplay(display){ //
+    function unwrapDisplay(display) { //
 
-        if(!display) return null;
+        if (!display) return null;
         var fragment = document.createDocumentFragment();
         var children = display.children;
-        while(children.length){
+        while (children.length) {
             fragment.appendChild(children[0]);
         }
         return fragment;
     }
 
 
-    Vash.parseFile = function(url, text){
+    function giveIdsToBoundNodes(bindSel) {
 
-        function endsWith(entireStr, ending){
+        var given = 0;
+        for (var i = 0; i < bindSel.length; i++) {
+            var node = bindSel[i];
+            if (!node.hasAttribute('id')) {
+                node.setAttribute('id', '_bound_node_' + i);
+                given++;
+            }
+        }
+        return given;
+
+    }
+
+    Vash.parseFile = function (url, text) {
+
+        function endsWith(entireStr, ending) {
             return (entireStr.lastIndexOf(ending) === (entireStr.length - ending.length) && entireStr.length > ending.length);
         }
 
         var isHTML = endsWith(url, ".html");
 
-        if(!isHTML)
+        if (!isHTML)
             return;
 
         var frag = buildFragment(text);
@@ -152,23 +176,212 @@
         var blueSel = childNodesByName(frag.querySelector('blueprint'));
         var scriptSel = frag.querySelector('script');
         var htmlSel = unwrapDisplay(frag.querySelector('display'));
+        var bindSel = htmlSel ? htmlSel.querySelectorAll("[bind]") : [];
 
-        var scriptText= scriptSel && scriptSel.innerHTML;
+        var given = giveIdsToBoundNodes(bindSel);
 
-        if(scriptText) {
+        var templSel = {};
+        var templId = 0;
+
+        var scriptText = scriptSel && scriptSel.innerHTML;
+
+        if (scriptText) {
             scriptText = wrapScript(scriptText, url);
             try {
                 addScriptElement(scriptText);
-            } catch(err) {
+            } catch (err) {
                 console.log(err);
             }
         } else {
             activeScriptData = activeScriptData || Object.create(defaultScriptDataPrototype);
         }
 
-        if(!activeScriptData)
+        if (!activeScriptData)
             throw new Error("Script Data Failure:" + url);
 
+
+        var templateSensors = [];
+
+
+        for (var i = 0; i < bindSel.length; i++) {
+            var node = bindSel[i];
+            var id = node.getAttribute('id');
+            var plans = parseTemplate(node.getAttribute('bind'));
+            for (var j = 0; j < plans.length; j++) {
+                var plan = plans[j];
+                var def = createSensorDefFromPlan(id, plan, j); // using activeScriptData as the target for new transform methods
+                templateSensors.push(def);
+            }
+        }
+
+        function createTemplateRenderMethod(id, attrName){
+
+            var f = function templateTransformMethod(msg, topic, tag) {
+                return doTemplateRenderMethod.call(this, id, attrName, msg);
+            };
+
+            return f;
+
+        }
+
+
+        function createTemplateTransformMethod(id, plan) {
+
+            var f = function templateTransformMethod(msg, topic, tag) {
+                return doTemplateTransformMethod.call(this, id, plan, msg);
+            };
+
+            return f;
+        }
+
+
+        function doTemplateRenderMethod(id, attrName, msg){
+
+            var node = this[id].raw();
+            if (attrName === "value") {
+                node.value = msg;
+            } else {
+                node[attrName] = msg;
+            }
+
+        }
+
+        function doTemplateTransformMethod(id, plan, msg){
+
+            if (plan.length <= 2) return msg;
+
+            var cur = msg;
+            var mi = this.mapItem;
+
+            // skip the first and last
+            for (var i = 1; i < plan.length - 1; i++) {
+                var tok = plan[i];
+
+                if (tok.type === "prop") {
+
+                    if (tok.optional) {
+                        cur = cur[tok.name] || "";
+                    } else {
+                        if (!cur.hasOwnProperty(tok.name)) {
+                            throw new Error("Trying to grab missing prop " + tok.name + " from val of " + plan[i - 1].name);
+                        } else {
+                            cur = cur[tok.name];
+                        }
+                    }
+
+                } else if (Array.isArray(tok)) {
+
+                    var vals = {};
+                    for (var j = 0; j < tok.length; j++) {
+                        vals[tok[j].name] = mi.findData(tok[j].name).read(tok[j].topic || "update");
+                    }
+
+                    cur = vals;
+
+                } else if (tok.type === "data") {
+                    cur = mi.findData(tok.name).read(tok.topic);
+
+                } else if (tok.type === "method") {
+
+                    if (!mi.scriptData[tok.name]) {
+                        throw new Error("Cog has no transform or filter method (" + tok.name + ") in scope");
+                    }
+
+                    cur = mi.scriptData[tok.name](cur);
+
+                } else if (tok.type === "attr") {
+                    var _node = mi.scriptData[id].raw();
+
+                    if (tok.name === "value") {
+                        cur = _node.value;
+                    } else {
+                        cur = mi.scriptData[id].raw().getAttribute(tok.name);
+                    }
+                }
+            }
+
+            return cur;
+
+        }
+
+
+        function createSensorDefFromPlan(id, plan, planNum) {
+
+
+            var def = {
+                autorun: true,
+                topic: "update",
+                watch: []
+            };
+
+
+            var tokens = plan;
+
+            var first = tokens[0];
+            var last = tokens[tokens.length - 1];
+
+            // everything is a need for a multi sensor
+            if (Array.isArray(first)) {
+                var needs = [];
+
+                // no topic for you if you are doing a multi
+                first.forEach(function doDataChunk(tok) {
+                    needs.push(tok.name);
+                });
+
+                def.watch = def.need = needs;
+                def.group = true;
+                def.batch = true;
+                def.retain = true;
+
+            } else if (first.type && first.type === "data") {
+                if (first.need) {
+                    def.need = first.name;
+                    def.watch = first.name;
+                } else {
+                    def.watch = first.name;
+                    def.optional = first.optional || false;
+                }
+
+                if (first.topic) def.on = first.topic;
+
+            } else if (first.type && first.type === "event") {
+                def.find = id;
+                def.topic = first.name;
+            } else {
+                var err = new Error("Malformed first token in plan.");
+                err._token = first;
+                throw err;
+            }
+
+            // emit, emitPresent, emitType
+
+            var transformMethodName = '_transform_' + id + '_' + planNum;
+            activeScriptData[transformMethodName] = createTemplateTransformMethod(id, plan);
+            def.transform = transformMethodName;
+            def.transformPresent = true;
+            def.transformType = PROP;
+
+            if (last.type === "data") {
+                def.pipe = last.name;
+
+            } else if (last.type === "attr") {
+
+                var renderMethodName = '_render_' + id + '_' + planNum;
+                activeScriptData[renderMethodName] = createTemplateRenderMethod(id, last.name);
+                def.run = renderMethodName;
+
+            } else if (last.type === "method") {
+                def.run = last.name;
+            }
+
+            console.log(id, plan, def);
+            return def;
+
+        }
+
+
+        templateMap[url] = templSel;
         scriptMap[url] = activeScriptData;
         activeScriptData = null;
 
@@ -176,6 +389,9 @@
             displayMap[url] = htmlSel;
 
         var blueprint = extractDeclarations(blueSel);
+
+        blueprint.sensors = blueprint.sensors.concat(templateSensors);
+
         blueprintMap[url] = blueprint;
 
     };
@@ -254,6 +470,7 @@
         decs.valves = [].concat(getDefs2(sel.valve, extractValveDef2));
         decs.dataSources = [].concat(getDefs2(sel.data, extractDataDef2));
         decs.dataSources = decs.dataSources.concat(getDefs2(sel.net, extractNetDef2));
+        decs.dataSources = decs.dataSources.concat(getDefs2(sel.ws, extractWSDef));
         decs.methods = [].concat(getDefs2(sel.method, extractMethodDef2));
         decs.properties = [].concat(getDefs2(sel.prop, extractPropDef2));
         decs.sensors = [].concat(getDefs2(sel.sensor, extractSensorDef2));
@@ -293,7 +510,9 @@
         var d = {
 
             name: extractString2(node, 'name'),
+            isGhost: extractBool2(node, 'ghost'),
             pipe: extractString2(node, 'pipe'),
+            pipeWhere: extractString2(node, 'to', 'first'),
             toggle: extractString2(node, 'toggle'),
             filter: extractString2(node, 'filter'),
             topic: extractString2(node, 'on', 'update'),
@@ -307,8 +526,8 @@
             transform: extractString2(node, 'transform'),
             transformPresent: extractHasAttr2(node, 'transform'),
             transformType: null,
-            adapt: extractString2(node, 'adapt'),
-            adaptPresent: extractHasAttr2(node, 'adapt'),
+            adapt: extractString2(node, 'conform'),
+            adaptPresent: extractHasAttr2(node, 'conform'),
             adaptType: null,
             autorun: false,
             batch: extractBool2(node, 'batch'),
@@ -379,8 +598,8 @@
             transform: extractString2(node, 'transform'),
             transformPresent: extractHasAttr2(node, 'transform'),
             transformType: null,
-            adapt: extractString2(node, 'adapt'),
-            adaptPresent: extractHasAttr2(node, 'adapt'),
+            adapt: extractString2(node, 'conform'),
+            adaptPresent: extractHasAttr2(node, 'conform'),
             adaptType: null,
             autorun: extractBool2(node, 'now,auto,autorun'),
             batch: extractBool2(node, 'batch'),
@@ -456,6 +675,7 @@
 
         var d =  {
             name: extractString2(node, 'name'),
+            bypass: extractString2(node, 'bypass'),
             control: extractBool2(node, 'control'),
             optional: extractBool2(node, 'optional'),
             field: extractString2(node, 'field'),
@@ -536,7 +756,7 @@
             isRoute: extractBool2(node, "route"),
             url: extractString2(node, "url"),
             source: extractString2(node, 'use') || extractString2(node, 'from,source'),
-            item: extractString2(node, 'make') || extractString2(node, 'to,item','cog'),
+            item: extractString2(node, 'make') || extractString2(node, 'to,item','itemData'),
             target: extractString2(node, "node,id,find")
 
         };
@@ -557,7 +777,7 @@
             isRoute: extractBool2(node, "route"),
             url: extractString2(node, "url"),
             source: extractString2(node, "from,source"),
-            item: extractString2(node, "to,value,item",'cog'),
+            item: extractString2(node, "to,value,item",'itemData'),
             key: extractString2(node, "key"),
             build: extractString2(node, 'build', 'append'), // scratch, append, sort
             order: extractBool2(node, 'order'), // will use flex order css
@@ -579,6 +799,7 @@
             name: extractString2(node, 'name'),
             inherit: extractBool2(node, 'inherit'),
             isRoute: extractBool2(node, 'route'),
+            isGhost: extractBool2(node, 'ghost'),
             value: extractString2(node, 'value'),
             valuePresent: extractHasAttr2(node, 'value'),
             valueType: null,
@@ -607,12 +828,26 @@
 
     }
 
+    function extractWSDef (node) {
+        var def = {
+            name: extractString2(node, "name"),
+            socket: extractString2(node, "socket"),
+            socketType: null,
+            prop: extractBool2(node, 'prop')
+        }
+
+        applyFieldType(def, 'socket', PROP);
+
+        return def;
+    }
+
     function extractNetDef2(node){
 
         var d = {
             name: extractString2(node, 'name'),
             inherit: extractBool2(node, 'inherit'),
             isRoute: extractBool2(node, 'route'),
+            isGhost: extractBool2(node, 'ghost'),
             value: extractString2(node, 'value'),
             valuePresent: extractHasAttr2(node, 'value'),
             valueType: null,
@@ -773,6 +1008,168 @@
                 return att.value;
         }
         return undefined;
+    }
+
+    function tokenize (str) {
+        let chains = str.split(/[;\n]/);
+
+        return chains.map(chain => chain && chain.trim()).filter(chain => chain !== "");
+    }
+
+    // chain = array of links
+    function parseChain (chain) {
+        const links = chain.split("|").map(link => link.trim());
+        return links;
+    }
+
+    // for each array of links in arr of links, parse link
+    // return array of bits per link in chain
+    function parseLink (link) {
+            // @    event
+            // #    attr or prop
+            // *    method
+            // ?    optional object prop or data loc
+            // !    needed data loc
+            // .    chain/deref operator
+            // :    topic operator
+
+        const first = link.charAt(0);
+        const syms = ["@", "#", "*"];
+
+        if (syms.indexOf(first) !== -1)
+            return [first, link.slice(1)];
+
+        else {
+           let bits = link.split(".");
+           return bits;
+        }
+    }
+
+    // for each array of bits  of link of chain
+    // return plan object
+    function planLink (bits) {
+        /*
+         * data | dataTopic | event | attr | method | filterMethod
+         * name | name      | name  | name | name   | name
+         *      | topic
+         */
+        const typeMap = {
+            "@": "event",
+            "#": "attr",
+            "*": "method"
+        };
+
+        if (bits[0] in typeMap) {
+            let plan = {
+                type: typeMap[bits[0]]
+            };
+
+            if (/\?$/.test(bits[1]) && plan.type === "method") {
+                plan.filter = true;
+                plan.name = bits[1].slice(0, -1);
+            } else {
+                plan.name = bits[1];
+            }
+
+            return plan;
+
+        } else {
+            return bits.map(planData);
+        }
+    }
+
+    // d p? cp
+    function planData (bit, _i) {
+        // first bit is always the data loc name
+        if (_i === 0) {
+            let name, topic;
+
+            let names = bit.split(",");
+
+            if (names.length > 1) {
+                let plans =  [];
+
+                for (let j = 0; j < names.length; j++) {
+                    plans.push(buildDataPlan(names[j]));
+                }
+
+                return plans;
+
+            } else {
+                return buildDataPlan(names[0]);
+            }
+
+        } else {
+            return buildProp(bit);
+        }
+    }
+
+    function buildProp (bit) {
+        let optional = /\?$/.test(bit);
+
+        return {
+            type: "prop",
+            optional: optional,
+            name: optional ? bit.slice(0, -1) : bit
+        };
+    }
+
+    function buildDataPlan (bit) {
+        let parts = bit.split(":");
+
+        let plan = {
+            name: parts[0],
+            type: "data"
+        };
+
+        if (parts[1]) plan.topic = parts[1];
+
+        if (/\?$/.test(parts[0])) {
+            plan.name = plan.name.slice(0, -1);
+            plan.optional = true;
+        }
+
+        if (/!$/.test(parts[0])) {
+            plan.name = plan.name.slice(0, -1);
+            plan.need = true;
+        }
+
+        return plan;
+    }
+
+    function parseTemplate (attrString) {
+        const chain = tokenize(attrString);
+        const links = chain.map(parseChain);
+        const bits  = links.map(link => link.map(parseLink));
+        const plans = bits.map(bitSet => bitSet.map(planLink));
+
+        /**
+         * get each piece of each plan in the plans
+         * (is that piece an array?)
+         * then
+         * get the place of that piece in the plan
+         * and splice each bit of that piece
+         * into the plan at the place where
+         * that piece was
+         *
+         * flatten the array a bit, that is
+         */
+        for (let plan of plans) {
+            for (let piece of plan) {
+
+                if (Array.isArray(piece)) {
+                    let place = plan.indexOf(piece);
+                    let first = true;
+
+                    for (let bit of piece) {
+                        plan.splice(place++, first ? 1 : 0, bit);
+                        first = false;
+                    }
+                }
+            }
+        }
+
+        return plans;
     }
 
 })(this);
