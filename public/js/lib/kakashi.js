@@ -57,7 +57,8 @@
 
         url = map[url] || url;
 
-        var raw = (url.indexOf("/") === 0 || url.indexOf("http://") === 0 || url.indexOf("https://") === 0);
+        var raw = (url.indexOf("/") === 0 || url.indexOf("http://") === 0 || url.indexOf("https://") === 0
+        || url.indexOf("ws://") === 0 || url.indexOf("wss://") === 0);
 
         if(raw)
             return url;
@@ -140,7 +141,8 @@
         if(!path && resolvedCache[url])
             return resolvedCache[url];
 
-        var raw = (url.indexOf("/") === 0 || url.indexOf("http://") === 0 || url.indexOf("https://") === 0);
+        var raw = (url.indexOf("/") === 0 || url.indexOf("http://") === 0 || url.indexOf("https://") === 0
+        || url.indexOf("ws://") === 0 || url.indexOf("wss://") === 0);
 
         if(raw)
             return resolvedCache[url] = url;

@@ -4,9 +4,11 @@
     <alias name="COGS" url="cogs" />
     <alias name="BUTTONS" url="buttons" path="COGS" />
 
+    <alias name="STORAGE" url="storage.html" path="ALLOYS" />
+
     <preload url="footer.html, header.html, main.html, item.html, itemEdit.html, itemView.html" path="COGS" />
 
-    <alloy url="storage.html" path="ALLOYS" />
+    <alloy url="STORAGE" />
     <alloy url="routes.html" path="ALLOYS" />
 
     <sensor watch="storage" adapt="hasItems" change="true" run="render" />

@@ -1,7 +1,7 @@
 ;(function($, window) {
 
     /**
-     * cognition.js (v2.3 templates and gather fix)
+     * cognition.js (v2.31 fixed dynamic pinion cog with source data bug)
      *
      * Copyright (c) 2015 Scott Southworth, Landon Barnickle, Nick Lorenson & Contributors
      *
@@ -27,14 +27,14 @@
     var parser = cognition.plugins.monolith('vash'); // turns blueprints into json
     var resolver = cognition.plugins.monolith('kakashi'); // resolves aliases and urls in contexts
     var downloader = cognition.plugins.monolith('ohmu'); // downloads batches of files
-    //var fetcher = cognition.plugins.monolith('???'); // ajax/fetch actions
+    //var fetcher = cognition.plugins.monolith('motoko'); // ajax/fetch actions
 
     var uid = 0;
 
     var COG_ROOT = bus.demandTree('COG_ROOT');
 
-    var buildNum = 'NEED_BUILD_NUM';
-    downloader.cacheBuster("app_version", buildNum);
+    //var buildNum = 'x10';
+    downloader.cacheBuster("app_version", cognition.buildNum);
 
     // cognition data types
 
@@ -83,6 +83,8 @@
     };
 
     cognition.init = function (node, url, debugUrl){
+
+        downloader.cacheBuster("app_version", cognition.buildNum);
 
         var root = cognition.root = new MapItem();
         root.cogZone = COG_ROOT;
@@ -249,6 +251,7 @@
 
         {name: 'properties', method: 'createProp'},
         {name: 'adapters', method: 'createAdapter'},
+        {name: 'relays', method: 'createRelay'},
         {name: 'dataSources', method: 'createData'},
         {name: 'commands', method: 'demandData'},
         {name: 'methods', method: 'createMethod'},
@@ -303,8 +306,6 @@
             self._cogFirstBuildDeclarations(defs);
 
         self.scriptData.init();
-
-      //  self.doTemplateBindings();
 
         if(defs) {
 
@@ -413,7 +414,9 @@
             mi.isPinion = true;
             mi.aliasContext0 = mi.aliasContext1 = mi.aliasContext2 = mi.aliasContext3 = self.aliasContext3;
             mi.targetNode = self.scriptData[mi.target];
-            mi.cogZone.findData(mi.url).on('update').change().as(mi).host(mi.uid).run(mi._cogReplaceUrl).autorun();
+            if(mi.source)
+                mi._resolveSource();
+            mi.cogZone.findData(mi.url).on('update').change().batch().as(mi).host(mi.uid).run(mi._cogReplaceUrl).autorun();
 
         }
 
@@ -528,14 +531,19 @@
                 return;
             }
 
-            this.sourceVal.on('update').as(this).host(this.uid).run(this._refreshListItems).autorun();
+            this.sourceVal.on('update').as(this).host(this.uid).batch().run(this._refreshListItems).autorun();
 
         } else {
+
 
             if(this.sourceVal === undefined){
                 this.throwError('data source: ' + this.source + ' could not be resolved with static type!');
                 return;
             }
+
+            //if(typeof this.sourceVal === 'function') -- not needed?
+            //    this.sourceVal = this.sourceVal.call(this.parent.scriptData);
+
             this._refreshListItems(this.sourceVal);
 
         }
@@ -585,6 +593,11 @@
 
         } else {
 
+            //if(typeof this.sourceVal === 'function') { - not needed?
+            //    this.sourceVal = this.isAlloy ? this.sourceVal.call(this.origin.scriptData) :
+            //        this.sourceVal.call(outerCog.scriptData);
+            //}
+
             if(this.itemType === DATA)
                 this.itemVal.write(this.sourceVal);
             else
@@ -620,6 +633,8 @@
     };
 
 
+    var listMake = 0;
+    var listTake = 0;
 
 
     MapItem.prototype._refreshListItems = function(arr){
@@ -644,15 +659,17 @@
 
             var displayItem;
             if(listItem) { // already exists
+
                 displayItem = listItem.isAlloy ? listItem.origin : listItem;
                 displayItem.itemDataLoc.write(d);
             } else {
+
                 listItem = this.createLink(url, itemDataName, d, i, itemKey);
                 displayItem = listItem.isAlloy ? listItem.origin : listItem;
             }
 
             //if(this.order)
-                //this.parent.localSel.append(displayItem.localSel);
+            //this.parent.localSel.append(displayItem.localSel);
 
             if(this.order) {
                 displayItem.localSel.reparent();
@@ -662,11 +679,13 @@
 
         }
 
+        // todo don't destroy cogs if we can pool them -- need to fire new method/event to note key change
         for(var oldKey in remnantKeyMap){
             listItem = remnantKeyMap[oldKey];
             if(!dataKeyMap[oldKey])
                 destroyMapItem(listItem);
         }
+
 
     };
 
@@ -916,6 +935,12 @@
     MapItem.prototype._senseInteraction = function(nodeId, eventName){
 
         var self = this;
+        var capture = false;
+
+        if(eventName.charAt(0)==='@'){
+            eventName = eventName.substr(1);
+            capture = true;
+        }
 
         var node = self.scriptData[nodeId];
         if (!node) {
@@ -929,7 +954,7 @@
             data.write(event, eventName);
         };
 
-        node.on(eventName, eventHandler);
+        node.on(eventName, eventHandler, capture);
 
         return data.on(eventName).emit('update');
 
@@ -980,7 +1005,7 @@
             sensor.change();
 
         if (def.filter) {
-            var filterMethod = context[def.filter];
+            var filterMethod = this._resolveValueFromType(def.filter, PROP);
             sensor.filter(filterMethod);
         }
 
@@ -1001,6 +1026,10 @@
 
         if(def.emitPresent){
             sensor.emit(this._resolveValueFromType(def.emit, def.emitType))
+        }
+
+        if(def.tagPresent){
+            sensor.tag(this._resolveValueFromType(def.tag, def.tagType))
         }
 
         if(def.retain && !def.forget)
@@ -1035,7 +1064,8 @@
         }
 
         if(def.run && !def.toggle && !def.pipe) {
-            var callback = context[def.run];
+            //var callback = context[def.run];
+            var callback = this._resolveValueFromType(def.run, PROP);
             sensor.run(callback);
         }
 
@@ -1264,8 +1294,18 @@
         }
 
         var context = this.scriptData;
-        if(type === PROP)
-            return context[value];
+
+        if(type === PROP) {
+            // only digs down one level
+            var names = value.split(".");
+
+            if (names.length === 2) {
+                return context[names[0]][names[1]];
+
+            } else {
+                return context[names[0]];
+            }
+        }
 
         if(type === RUN)
             return this._resolveRunValue(value, context);
@@ -1313,6 +1353,60 @@
         }
 
     };
+
+    MapItem.prototype.createRelay = function(def){
+
+        var z = this.cogZone;
+        var self = this;
+
+        var localIn = def.in;
+        var localOut = def.out;
+
+        var localInData = localIn && z.demandData(localIn);
+        var localOutData = localOut && z.demandData(localOut);
+
+        if(localOutData && def.prop){
+                if(self.scriptData[localOut])
+                    self.throwError("Property already defined: " + localOut);
+                self.scriptData[localOut] = localOutData;
+        }
+
+        if(localInData && def.prop){
+            if(self.scriptData[localIn])
+                self.throwError("Property already defined: " + localIn);
+            self.scriptData[localIn] = localInData;
+        }
+
+        var itemName = def.item || (this.parent.isChain || this.parent.isPinion ? this.parent.item : this.item); // todo look up why diff on chains - need alloy skip? need pinion check?
+        var options = z.findData(itemName).read(); // todo add error crap if this stuff fails
+
+        var externalIn = options[localIn];
+        var externalOut = options[localOut];
+
+        var externalInData = externalIn && z.findData(externalIn, 'parent', def.optional);
+        var externalOutData = externalOut && z.findData(externalOut, 'parent', def.optional);
+
+        if(localInData && localOutData && !externalInData && !externalOutData){
+            localOutData.on('*').host(this.uid).pipe(localInData);
+            return; //nothing external, wire locally
+        }
+
+        if(externalInData && localInData){ // watch the in data -- or watch the cmd point if not found
+            externalInData.on('*').host(this.uid).pipe(localInData).autorun();
+        } else if (externalOutData && localInData) {
+            externalOutData.on('*').host(this.uid).pipe(localInData).autorun();
+        }
+
+        if(externalOutData && localOutData) { // control the out data -- or the in if not found
+            localOutData.on('*').host(this.uid).pipe(externalOutData);
+        } else if (externalInData && localOutData) {
+            localOutData.on('*').host(this.uid).pipe(externalInData);
+        }
+
+
+
+    };
+
 
     MapItem.prototype.createData = function(def){
 
@@ -1447,12 +1541,12 @@
         this._location = location;
         this.settings = settings;
 
-        cognition.plugins.use("tachikoma", this._location);
-    }
+        cognition.plugins.use("tachikoma", this._location, this.settings);
+    };
 
     WSocket.prototype.send = function send (msg) {
         this._location.write(msg, "send");
-    }
+    };
 
     var WebService = function() {
 
@@ -1477,39 +1571,22 @@
 
         cognition.plugins.use("ajax", this._location);
 
-        location.on('settings,inline_settings')
-            .host(cog.uid)
-            .batch()
-            .merge('*')
-            .batch()
-            .group(function(msg,topic){return topic;})
-            .retain()
-            .transform(function(msg){return overrideSettings(msg.settings, msg.inline_settings)})
-            .emit('mixed_settings')
-            .pipe(location);
+        var self = this;
 
-        location.on('mixed_settings')
-            .host(cog.uid)
-            .batch()
-            .filter(function(msg){return msg && msg.request;})
-            .transform(function(){ return {}})
-            .emit('request')
-            .pipe(location);
+        this._cog = cog;
+        this.settings(settings);
+        this._location.service(this);
 
         location.on('request')
             .host(cog.uid)
             .transform(function(msg){
                 var request_settings = (typeof msg === 'object') ? msg : {};
-                var mixed_settings = location.read('mixed_settings');
-                var final_settings = overrideSettings(mixed_settings, request_settings);
+                var final_settings = overrideSettings(self._settings, request_settings);
                 return final_settings;
             })
             .emit('do_request')
             .pipe(location);
 
-        this._cog = cog;
-        this.settings(settings);
-        this._location.service(this);
 
         return this;
 

@@ -43,10 +43,12 @@
         }
 
         if(domish.nodeType === 11) { // fragment node
-            children = domish.children;
+            children = domish.childNodes;
             count = children.length;
             for(i = 0; i < count; i++){
-                nodes.push(children[i]);
+                var child = children[i];
+                if(child.nodeType === 1)
+                    nodes.push(children[i]);
             }
             return (count === 1) ? nodes[0] : domish;
         }

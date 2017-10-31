@@ -17,6 +17,7 @@
         }
 
         function request (_settings) {
+
             iface.write("busy", "condition");
 
             var settings = {};
@@ -27,13 +28,15 @@
             settings.dataType    = _settings.accept || _settings.type || _settings.format || "html";
             settings.contentType = _settings.contentType || "json";
             settings.headers     = _settings.headers;
-            settings.timeout     = _settings.timeout || 10000;
+            settings.timeout     = _settings.timeout || 60000;
+            if (settings.type === 'POST') {
+                settings.contentType = "application/json";
+            }
 
             _xhr = jQuery.ajax(settings)
                 .done(function (resp) {
                     iface.write("done", "condition");
                     iface.write(resp);
-                    iface.write(resp, "done");
 
                 }).fail(function (err) {
                     iface.write("error", "condition");
@@ -44,7 +47,7 @@
         iface.on("abort").run(abort);
         iface.on("do_request").run(request);
         iface.on("destroy").run(handleDestroy);
-    }
+    };
 
     if (context.seele) {
       context.seele.register("ajax", ajaxPlugin);

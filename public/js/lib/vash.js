@@ -1,5 +1,5 @@
 /* jshint node: false, esversion: 6 */
-// version 1.6.0 -- templates only on prototype
+// version 1.8.2 -- added relay tag and filters
 
 ;(function VASH(context) {
     "use strict";
@@ -246,15 +246,15 @@
 
         }
 
+        /**
+        * Recieves a subset of the plan objects
+        */
         function doTemplateTransformMethod(id, plan, msg){
-
-            if (plan.length <= 2) return msg;
 
             var cur = msg;
             var mi = this.mapItem;
 
-            // skip the first and last
-            for (var i = 1; i < plan.length - 1; i++) {
+            for (var i = 0; i < plan.length; i++) {
                 var tok = plan[i];
 
                 if (tok.type === "prop") {
@@ -304,6 +304,112 @@
 
         }
 
+        function createTransforms (id, plan, planNum, def) {
+
+            var filterFunMap = {
+                "lt-filter": function (val) {
+                    return function (msg) {
+                        return msg < val;
+                    }
+                },
+
+                "gt-filter": function (val) {
+                    return function (msg) {
+                        return msg > val;
+                    }
+                },
+
+                "lte-filter": function (val) {
+                    return function (msg) {
+                        return msg <= val;
+                    }
+                },
+
+                "gte-filter": function (val) {
+                    return function (msg) {
+                        return msg >= val;
+                    }
+                },
+
+                "eq-filter": function (val) {
+                    return function (msg) {
+                        return msg === val;
+                    }
+                },
+
+                "neq-filter": function (val) {
+                    return function (msg) {
+                        return msg !== val;
+                    }
+                },
+
+                // 0 > false
+                // "" > false
+                // "cat" > true
+                "truthy-filter": function () {
+                    return function (msg) {
+                        return !!msg;
+                    }
+                },
+
+                // 0 > true
+                // "" > true
+                // "cat" > false
+                "falsey-filter": function () {
+                    return function (msg) {
+                        return !!!msg;
+                    }
+                }
+            };
+
+            var hasFilter = false;
+            var filterPosition = null;
+
+            for (var i = 1; i < plan.length - 1; i++) {
+                if (hasFilter && plan[i].isFilter) {
+                    var err = new Error("You can only bind one filter per directive. Found an extra: " + plan[i].name);
+                    throw err;
+
+                } else if (plan[i].isFilter) {
+                    hasFilter = true;
+                    filterPosition = i;
+                }
+            }
+
+            if (hasFilter) {
+                var conformMethodName = '_conform_' + id + '_' +  planNum;
+                activeScriptData[conformMethodName] = createTemplateTransformMethod(id, plan.slice(1, filterPosition));
+
+                def.adapt = conformMethodName;
+                def.adaptPresent = true;
+                def.adaptType = PROP;
+
+                if (plan[filterPosition].type === "method") {
+                    def.filter = plan[filterPosition].name;
+
+                } else {
+                    var filter = plan[filterPosition];
+                    var filterMethodName =  "_" + filter.type + "_" + (filter.value || "") + "_" + id + "_" + planNum;
+
+                    activeScriptData[filterMethodName] = filterFunMap[filter.type](filter.value/*, msg comes in here */);
+
+                    def.filter = filterMethodName;
+                }
+
+                var transformMethodName = '_transform_' + id + '_' + planNum;
+                activeScriptData[transformMethodName] = createTemplateTransformMethod(id, plan.slice(filterPosition + 1, -1));
+
+            } else {
+                var transformMethodName = '_transform_' + id + '_' + planNum;
+                activeScriptData[transformMethodName] = createTemplateTransformMethod(id, plan.slice(1, -1));
+            }
+
+            def.transform = transformMethodName;
+            def.transformPresent = true;
+            def.transformType = PROP;
+
+            return def;
+        }
 
         function createSensorDefFromPlan(id, plan, planNum) {
 
@@ -354,13 +460,7 @@
                 throw err;
             }
 
-            // emit, emitPresent, emitType
-
-            var transformMethodName = '_transform_' + id + '_' + planNum;
-            activeScriptData[transformMethodName] = createTemplateTransformMethod(id, plan);
-            def.transform = transformMethodName;
-            def.transformPresent = true;
-            def.transformType = PROP;
+            def = createTransforms(id, plan, planNum, def);
 
             if (last.type === "data") {
                 def.pipe = last.name;
@@ -375,7 +475,7 @@
                 def.run = last.name;
             }
 
-            console.log(id, plan, def);
+            //console.log(id, plan, def);
             return def;
 
         }
@@ -467,6 +567,7 @@
 
         decs.aliases = [].concat(getDefs2(sel.alias, extractAliasDef2));
         decs.adapters = [].concat(getDefs2(sel.adapter, extractAdapterDef2));
+        decs.relays = [].concat(getDefs2(sel.relay, extractRelayDef));
         decs.valves = [].concat(getDefs2(sel.valve, extractValveDef2));
         decs.dataSources = [].concat(getDefs2(sel.data, extractDataDef2));
         decs.dataSources = decs.dataSources.concat(getDefs2(sel.net, extractNetDef2));
@@ -498,7 +599,7 @@
         return {
             name: extractString2(node, 'name'),
             path: extractString2(node, 'path'),
-            url: extractString2(node, 'url'),
+            url: window.location.hostname === 'localhost' && extractHasAttr2(node, 'local') ? extractString2(node, 'local') : extractString2(node, 'url'),
             prop: extractBool2(node, 'prop')
         };
 
@@ -534,7 +635,8 @@
             keep: 'last', // first, all, or last
             need: extractStringArray2(node, 'need'),
             gather: extractStringArray2(node, 'gather'),
-            defer: extractBool2(node, 'defer')
+            defer: extractBool2(node, 'defer'),
+            prop: extractBool2(node, 'prop')
 
         };
 
@@ -584,6 +686,9 @@
             filter: extractString2(node, 'filter'),
             topic: extractString2(node, 'for,on,topic', 'update'),
             run: extractString2(node, 'run'),
+            tag: extractString2(node, 'tag'),
+            tagPresent: extractHasAttr2(node, 'tag'),
+            tagType: null,
             emit: extractString2(node, 'emit'),
             emitPresent: extractHasAttr2(node, 'emit'),
             emitType: null,
@@ -641,6 +746,7 @@
 
         applyFieldType(d, 'transform', PROP);
         applyFieldType(d, 'emit', STRING);
+        applyFieldType(d, 'tag', STRING);
         applyFieldType(d, 'adapt', PROP);
 
         return d;
@@ -689,6 +795,18 @@
 
         applyFieldType(d, 'field', STRING);
 
+
+        return d;
+    }
+
+    function extractRelayDef(node){
+
+        var d =  {
+            in: extractString2(node, 'in'),
+            out: extractString2(node, 'out'),
+            optional: extractBool2(node, 'optional'),
+            prop: extractBool2(node, 'prop')
+        };
 
         return d;
     }
@@ -1011,14 +1129,16 @@
     }
 
     function tokenize (str) {
-        let chains = str.split(/[;\n]/);
+        var chains = str.split(/[;\n]/);
 
-        return chains.map(chain => chain && chain.trim()).filter(chain => chain !== "");
+        return chains.map(
+                function(c){ return c && c.trim();}).filter(
+                function(c){ return c !== ""; });
     }
 
     // chain = array of links
     function parseChain (chain) {
-        const links = chain.split("|").map(link => link.trim());
+        var links = chain.split("|").map(function(link){ return link && link.trim();});
         return links;
     }
 
@@ -1031,16 +1151,45 @@
             // ?    optional object prop or data loc
             // !    needed data loc
             // .    chain/deref operator
-            // :    topic operator
+            // :    topic separator
+            // >
+            // <
+            // >=
+            // <=
+            // ===
+            // !==
+            // ~false
+            // ~true
 
-        const first = link.charAt(0);
-        const syms = ["@", "#", "*"];
+        //var syms = ["@", "#", "*", ">", "<", ">=", "<=", "===", "!==", "~false", "~true"];
+        //var re = buildRegex(syms);
 
-        if (syms.indexOf(first) !== -1)
-            return [first, link.slice(1)];
+        var re = /^(@|#|\*|>=|<=|>|<|===|!==|~false|~true)/;
 
-        else {
-           let bits = link.split(".");
+        var res;
+
+        if ((res = re.exec(link))) {
+            var sym = res[0];
+            var len = sym.length;
+            var val = link.slice(len).trim();
+
+            // if we don't see single quotes wrapping a the val, assume
+            // a number
+            // (trying not to actually look at the val)
+            if (/(>=|<=|>|<|===|!==)/.test(sym) && !/'.*'/.test(val)) {
+                var work = val;
+                val = parseFloat(work);
+
+                if (isNaN(val)) throw new Error("Vash: NaN'd a string with parseFloat: \"" + work +"\". String values have to be single quoted (e.g. 'bark'), numbers have to be unquoted (e.g. 5).");
+
+            } else if (/'.*'/.test(val)) {
+                val = val.replace(/'/g, "");
+            }
+
+            return [sym, val];
+
+        } else {
+           var bits = link.split(".");
            return bits;
         }
     }
@@ -1053,43 +1202,67 @@
          * name | name      | name  | name | name   | name
          *      | topic
          */
-        const typeMap = {
+
+        var typeMap = {
             "@": "event",
             "#": "attr",
             "*": "method"
         };
 
+        var compMap = {
+            "<"      : "lt-filter",
+            ">"      : "gt-filter",
+            "<="     : "lte-filter",
+            ">="     : "gte-filter",
+            "==="    : "eq-filter",
+            "!=="    : "neq-filter",
+            "~true"  : "truthy-filter",
+            "~false" : "falsey-filter",
+        };
+
+        var plan;
+
         if (bits[0] in typeMap) {
-            let plan = {
+            plan = {
                 type: typeMap[bits[0]]
             };
 
             if (/\?$/.test(bits[1]) && plan.type === "method") {
-                plan.filter = true;
+                plan.isFilter = true;
                 plan.name = bits[1].slice(0, -1);
+
             } else {
                 plan.name = bits[1];
             }
 
             return plan;
 
+        } else if (bits[0] in compMap) {
+            plan = {
+                type: compMap[bits[0]],
+                isFilter: true,
+                value: bits[1] || null
+            };
+
+            return plan;
+
         } else {
             return bits.map(planData);
         }
+
     }
 
     // d p? cp
     function planData (bit, _i) {
         // first bit is always the data loc name
         if (_i === 0) {
-            let name, topic;
 
-            let names = bit.split(",");
+            var names = bit.split(",");
 
             if (names.length > 1) {
-                let plans =  [];
+                var plans =  [];
 
-                for (let j = 0; j < names.length; j++) {
+                for (var j = 0; j < names.length; j++) {
                     plans.push(buildDataPlan(names[j]));
                 }
 
@@ -1105,7 +1278,7 @@
     }
 
     function buildProp (bit) {
-        let optional = /\?$/.test(bit);
+        var optional = /\?$/.test(bit);
 
         return {
             type: "prop",
@@ -1115,9 +1288,9 @@
     }
 
     function buildDataPlan (bit) {
-        let parts = bit.split(":");
+        var parts = bit.split(":");
 
-        let plan = {
+        var plan = {
             name: parts[0],
             type: "data"
         };
@@ -1138,10 +1311,11 @@
     }
 
     function parseTemplate (attrString) {
-        const chain = tokenize(attrString);
-        const links = chain.map(parseChain);
-        const bits  = links.map(link => link.map(parseLink));
-        const plans = bits.map(bitSet => bitSet.map(planLink));
+
+        var chain = tokenize(attrString);
+        var links = chain.map(parseChain);
+        var bits  = links.map(function(link){ return link.map(parseLink);});
+        var plans = bits.map(function(bitSet) { return bitSet.map(planLink);});
 
         /**
          * get each piece of each plan in the plans
@@ -1154,14 +1328,21 @@
          *
          * flatten the array a bit, that is
          */
-        for (let plan of plans) {
-            for (let piece of plan) {
+
+
+
+        for(var i = 0; i < plans.length; i++){
+            var plan = plans[i];
+            for(var j = 0; j < plan.length; j++){
+                var piece = plan[j];
 
                 if (Array.isArray(piece)) {
-                    let place = plan.indexOf(piece);
-                    let first = true;
 
-                    for (let bit of piece) {
+                    var place = plan.indexOf(piece);
+                    var first = true;
+
+                    for(var k = 0; k < piece.length; k++){
+                        var bit = piece[k];
                         plan.splice(place++, first ? 1 : 0, bit);
                         first = false;
                     }
@@ -1169,7 +1350,25 @@
             }
         }
 
+
         return plans;
+
+        //for (var plan of plans) {
+        //    for (var piece of plan) {
+        //
+        //        if (Array.isArray(piece)) {
+        //            var place = plan.indexOf(piece);
+        //            var first = true;
+        //
+        //            for (let bit of piece) {
+        //                plan.splice(place++, first ? 1 : 0, bit);
+        //                first = false;
+        //            }
+        //        }
+        //    }
+        //}
+        //
+        //return plans;
     }
 
 })(this);
