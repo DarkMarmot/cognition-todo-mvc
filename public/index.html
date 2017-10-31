@@ -2,7 +2,7 @@
 <html lang="en">
 	<head>
 		<meta charset="utf-8">
-		<title>Template • TodoMVC</title>
+		<title>Cognition TodoMVC</title>
 		<link rel="stylesheet" href="css/app.css">
         <link rel="stylesheet" href="css/font-awesome.min.css"  >
         <style>
@@ -13,27 +13,16 @@
         </style>
 
 	</head>
-	<body >
+	<body>
 
         <div id="todo_app" style="position: relative; width: 100%; height: 100%; top: 0; left: 0;"></div>
 
-		<script src="js/lib/director.js"></script>
-        <script src="js/lib/jquery.js"></script>
-        <script src="js/lib/seele.js"></script>
-        <script src="js/lib/catbus.js"></script>
-        <script src="js/lib/rei.js"></script>
-        <script src="js/lib/vash.js"></script>
-        <script src="js/lib/ohmu.js"></script>  <!-- batch file loader -->
-        <script src="js/lib/kakashi.js"></script>  <!-- alias/file resolver -->
-
-        <script src="js/lib/cognition.js"></script>
-
+		<script src="./js/director.js"></script>
+        <script src="./js/muta.umd.js"></script>
 
         <script>
 
-            $(function(){
-                $.cognition.init($("#todo_app")[0], "/todo_app/app.html", "/grue/grue.html");
-            });
+            Muta.init(document.querySelector('#todo_app'),  './app/index.js');
 
         </script>
 
